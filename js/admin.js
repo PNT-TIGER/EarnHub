@@ -257,14 +257,16 @@ function loadAdminUsers() {
   }
   container.innerHTML = '';
   users.slice().reverse().forEach(u => {
+    const hasScreenshots = u.taskScreenshots && Object.keys(u.taskScreenshots).length > 0;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color)';
     row.innerHTML = `
       <div>
         <div style="font-weight:600;font-size:14px">${u.username}</div>
-        <div style="font-size:12px;color:var(--text-muted)">Balance: $${u.balance.toFixed(2)} | Tasks: ${u.completedTasks.length} | Ref: ${u.referrals.length}</div>
+        <div style="font-size:12px;color:var(--text-muted)">Balance: $${u.balance.toFixed(2)} | Tasks: ${u.completedTasks.length} | Ref: ${u.referrals.length}${hasScreenshots ? ' | 📸 Screenshots: ' + Object.keys(u.taskScreenshots).length : ''}</div>
       </div>
       <div class="admin-actions">
+        ${hasScreenshots ? `<button class="btn btn-sm btn-outline" onclick="viewUserScreenshots('${u.id}')">📸</button>` : ''}
         <button class="btn btn-sm btn-success" onclick="addUserBalance('${u.id}')">💰</button>
       </div>
     `;
@@ -307,6 +309,29 @@ function confirmAddBalance(userId) {
     notifyBalanceAdded(user, amount, adminUser?.username || 'admin');
     loadAdminUsers();
   }
+}
+
+function viewUserScreenshots(userId) {
+  const users = DB.get('users', []);
+  const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots) return;
+  const tasks = DB.get('tasks', []);
+  let html = '';
+  for (const [taskId, ss] of Object.entries(user.taskScreenshots)) {
+    const task = tasks.find(t => t.id === taskId);
+    html += `
+      <div style="margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">${task ? task.title : 'Unknown Task'}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Reward: ${task ? task.reward : '?'} USDT | ${user.claimedTasks.includes(taskId) ? '✅ Claimed' : '⏳ Pending'}</div>
+        <img src="${ss}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:var(--bg-primary)" onclick="window.open(this.src)">
+      </div>
+    `;
+  }
+  const modal = document.getElementById('adminModal');
+  document.getElementById('adminModalTitle').textContent = '📸 Screenshots - ' + user.username;
+  document.getElementById('adminModalBody').innerHTML = html || '<div class="empty-state"><p>No screenshots</p></div>';
+  document.getElementById('adminModalFooter').innerHTML = '<button class="btn btn-outline btn-small" onclick="closeAdminModal()">Close</button>';
+  modal.classList.add('active');
 }
 
 // ===== WITHDRAWALS =====

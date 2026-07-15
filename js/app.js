@@ -135,6 +135,7 @@ function handleRegister() {
     balance: 0,
     completedTasks: [],
     claimedTasks: [],
+    taskScreenshots: {},
     totalWithdrawn: 0,
     usdtAddress: '',
     referredBy: '',
@@ -285,26 +286,55 @@ function renderTasks(filter = 'all') {
               markTaskCompleted(t.id);
             } else showToast('No link provided', 'error');
           }
-        }, '🔗 Open Task'),
+        }, isCompleted ? '✅ Re-Open' : '🔗 Open Task'),
+        isCompleted && !isClaimed ? el('button', {
+          className: 'task-btn',
+          style: 'background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color)',
+          onclick: () => uploadScreenshot(t.id)
+        }, currentUser.taskScreenshots?.[t.id] ? '📸 Resubmit' : '📸 Screenshot') : null,
         el('button', {
           className: 'task-btn btn-claim',
-          disabled: !isCompleted || isClaimed,
+          disabled: !isCompleted || isClaimed || !currentUser.taskScreenshots?.[t.id],
           onclick: () => claimTask(t.id)
-        }, isClaimed ? '✓ Claimed' : isCompleted ? '💰 Claim Reward' : '⏳ Open First')
+        }, isClaimed ? '✓ Claimed' : !currentUser.taskScreenshots?.[t.id] && isCompleted ? '📸 Upload First' : isCompleted ? '💰 Claim Reward' : '⏳ Open First')
       ),
-      el('div', { className: `task-status ${isClaimed ? 'status-claimed' : isCompleted ? 'status-completed' : 'status-pending'}` },
-        isClaimed ? '✓ Reward Claimed' : isCompleted ? '✅ Completed - Claim Now' : '⏳ Click "Open Task" to start'
+      el('div', { className: `task-status ${isClaimed ? 'status-claimed' : currentUser.taskScreenshots?.[t.id] ? 'status-completed' : 'status-pending'}` },
+        isClaimed ? '✓ Reward Claimed' : currentUser.taskScreenshots?.[t.id] ? '✅ Screenshot Uploaded - Claim Now' : isCompleted ? '📸 Upload Screenshot to Claim' : '⏳ Click "Open Task" to start'
       )
     );
     container.appendChild(card);
   });
 }
 
+function uploadScreenshot(taskId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('File too large! Max 5MB', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (!currentUser.taskScreenshots) currentUser.taskScreenshots = {};
+      currentUser.taskScreenshots[taskId] = ev.target.result;
+      saveCurrentUser();
+      showToast('Screenshot uploaded! ✅ Now you can claim reward', 'success');
+      renderTasks();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
 function markTaskCompleted(taskId) {
   if (!currentUser.completedTasks.includes(taskId)) {
     currentUser.completedTasks.push(taskId);
     saveCurrentUser();
-    showToast('Task opened! Now click Claim to get reward', 'success');
+    showToast('Task opened! Upload screenshot as proof then claim', 'info');
     renderTasks();
   }
 }
