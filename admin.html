@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>EarnHub - Admin Panel</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body style="padding-bottom:0">
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ADMIN LOGIN -->
+  <div id="adminLogin" class="auth-container">
+    <div class="auth-logo animate-float" style="width:80px;height:80px;font-size:32px">🔐</div>
+    <h1 class="auth-title" style="font-size:24px">Admin Panel</h1>
+    <p class="auth-subtitle">EarnHub Administration</p>
+
+    <div id="adminError" class="auth-error" style="margin-bottom:12px"></div>
+
+    <form onsubmit="event.preventDefault(); adminLogin()" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:16px">
+      <div class="form-group">
+        <label>Admin Username</label>
+        <input type="text" id="adminUsername" class="form-input" placeholder="admin" value="admin">
+      </div>
+      <div class="form-group">
+        <label>Admin Password</label>
+        <input type="password" id="adminPassword" class="form-input" placeholder="admin123" value="admin123">
+      </div>
+      <button type="submit" class="btn btn-gold btn-block">Login to Admin</button>
+    </form>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div id="adminPanel" style="display:none">
+    <div class="container">
+      <div class="page-header">
+        <div class="header-left">
+          <div class="header-logo">⚙️</div>
+          <div class="header-title">Admin Panel</div>
+        </div>
+        <div class="header-right">
+          <span style="font-size:13px;color:var(--text-secondary)">👤 <span id="adminUser">admin</span></span>
+          <button class="btn btn-small btn-outline" onclick="adminLogout()" style="color:var(--accent-red);border-color:var(--accent-red)">Logout</button>
+        </div>
+      </div>
+
+      <!-- Admin Nav -->
+      <div class="admin-nav">
+        <button class="admin-nav-btn active" data-tab="dashboard" onclick="adminNavigate('dashboard')">📊 Dashboard</button>
+        <button class="admin-nav-btn" data-tab="tasks" onclick="adminNavigate('tasks')">📋 Tasks</button>
+        <button class="admin-nav-btn" data-tab="ads" onclick="adminNavigate('ads')">📢 Ads</button>
+        <button class="admin-nav-btn" data-tab="users" onclick="adminNavigate('users')">👥 Users</button>
+        <button class="admin-nav-btn" data-tab="withdrawals" onclick="adminNavigate('withdrawals')">💸 Withdrawals</button>
+        <button class="admin-nav-btn" data-tab="giftcodes" onclick="adminNavigate('giftcodes')">🎁 Gift Codes</button>
+        <button class="admin-nav-btn" data-tab="settings" onclick="adminNavigate('settings')">⚙️ Settings</button>
+      </div>
+
+      <!-- DASHBOARD TAB -->
+      <div id="dashboardTab" class="admin-tab active">
+        <div class="section-title">📊 Dashboard Overview</div>
+
+        <div class="admin-stats-grid">
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminTotalUsers">0</div>
+            <div class="admin-stat-label">Total Users</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminTotalTasks">0</div>
+            <div class="admin-stat-label">Total Tasks</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminTotalAds">0</div>
+            <div class="admin-stat-label">Total Ads</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminPendingWithdrawals">0</div>
+            <div class="admin-stat-label">Pending Withdrawals</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminTotalWithdrawn">$0.00</div>
+            <div class="admin-stat-label">Total Withdrawn</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-value" id="adminTotalBalance">$0.00</div>
+            <div class="admin-stat-label">Total User Balance</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-small btn-outline" onclick="adminNavigate('tasks')" style="flex:1">📋 Manage Tasks</button>
+          <button class="btn btn-small btn-outline" onclick="adminNavigate('ads')" style="flex:1">📢 Manage Ads</button>
+          <button class="btn btn-small btn-outline" onclick="adminNavigate('withdrawals')" style="flex:1">💸 Withdrawals</button>
+        </div>
+
+        <div style="margin-top:20px;padding:16px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">⚠️ Danger Zone</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-small btn-danger" onclick="deleteAllUsers()">🗑️ Delete All Users</button>
+            <button class="btn btn-small btn-danger" onclick="deleteAllTasks()">🗑️ Delete All Tasks</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TASKS TAB -->
+      <div id="tasksTab" class="admin-tab">
+        <div class="admin-section-title">
+          <span>📋 Manage Tasks</span>
+          <button class="btn btn-gold btn-small" onclick="showAddTaskForm()">+ Add Task</button>
+        </div>
+
+        <div id="taskForm" style="display:none;background:var(--bg-card);border-radius:var(--radius);padding:20px;margin-bottom:16px;border:1px solid var(--accent-gold)">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px" id="taskFormTitle">Add New Task</div>
+          <input type="hidden" id="taskId">
+          <div class="admin-form-group">
+            <label>Task Title</label>
+            <input type="text" id="taskTitle" placeholder="e.g., Follow us on Twitter">
+          </div>
+          <div class="admin-form-group">
+            <label>Task Link</label>
+            <input type="url" id="taskLink" placeholder="https://example.com/task">
+          </div>
+          <div class="admin-form-group">
+            <label>Description</label>
+            <textarea id="taskDescription" placeholder="Describe what user needs to do..."></textarea>
+          </div>
+          <div class="admin-form-group">
+            <label>Reward (USDT)</label>
+            <input type="number" id="taskReward" placeholder="0.50" step="0.01" min="0.01">
+          </div>
+          <div class="admin-form-group">
+            <label style="display:flex;align-items:center;gap:12px">
+              <span>Active</span>
+              <label class="switch">
+                <input type="checkbox" id="taskActive" checked>
+                <span class="slider"></span>
+              </label>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-gold btn-small" onclick="saveTask()">💾 Save Task</button>
+            <button class="btn btn-outline btn-small" onclick="hideTaskForm()">Cancel</button>
+          </div>
+        </div>
+
+        <div id="adminTasksList"></div>
+      </div>
+
+      <!-- ADS TAB -->
+      <div id="adsTab" class="admin-tab">
+        <div class="admin-section-title">
+          <span>📢 Manage Ads</span>
+          <button class="btn btn-gold btn-small" onclick="showAddAdForm()">+ Add Ad</button>
+        </div>
+
+        <div id="adForm" style="display:none;background:var(--bg-card);border-radius:var(--radius);padding:20px;margin-bottom:16px;border:1px solid var(--accent-gold)">
+          <div style="font-size:16px;font-weight:700;margin-bottom:16px" id="adFormTitle">Add New Ad</div>
+          <input type="hidden" id="adId">
+          <div class="admin-form-group">
+            <label>Ad Title</label>
+            <input type="text" id="adTitle" placeholder="e.g., Sponsored by Partner">
+          </div>
+          <div class="admin-form-group">
+            <label>Ad Link</label>
+            <input type="url" id="adLink" placeholder="https://example.com/ad">
+          </div>
+          <div class="admin-form-group">
+            <label>Description</label>
+            <textarea id="adDescription" placeholder="Ad description..."></textarea>
+          </div>
+          <div class="admin-form-group">
+            <label>Image URL</label>
+            <input type="url" id="adImage" placeholder="https://example.com/image.jpg">
+          </div>
+          <div class="admin-form-group">
+            <label>Payout (USDT)</label>
+            <input type="number" id="adPayout" placeholder="0.10" step="0.01" min="0.01">
+          </div>
+          <div class="admin-form-group">
+            <label style="display:flex;align-items:center;gap:12px">
+              <span>Active</span>
+              <label class="switch">
+                <input type="checkbox" id="adActive" checked>
+                <span class="slider"></span>
+              </label>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-gold btn-small" onclick="saveAd()">💾 Save Ad</button>
+            <button class="btn btn-outline btn-small" onclick="hideAdForm()">Cancel</button>
+          </div>
+        </div>
+
+        <div id="adminAdsList"></div>
+      </div>
+
+      <!-- USERS TAB -->
+      <div id="usersTab" class="admin-tab">
+        <div class="admin-section-title">
+          <span>👥 Manage Users</span>
+          <span style="font-size:13px;color:var(--text-muted)" id="userCount">0 users</span>
+        </div>
+        <div id="adminUsersList"></div>
+      </div>
+
+      <!-- WITHDRAWALS TAB -->
+      <div id="withdrawalsTab" class="admin-tab">
+        <div class="admin-section-title">
+          <span>💸 Withdrawal Requests</span>
+        </div>
+        <div id="adminWithdrawalsList"></div>
+      </div>
+
+      <!-- GIFT CODES TAB -->
+      <div id="giftcodesTab" class="admin-tab">
+        <div class="admin-section-title">
+          <span>🎁 Gift Codes</span>
+          <button class="btn btn-gold btn-small" onclick="showAddGiftCodeForm()">+ Create Code</button>
+        </div>
+        <div id="adminGiftCodesList"></div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="settingsTab" class="admin-tab">
+        <div class="section-title">⚙️ Settings</div>
+
+        <div class="profile-card">
+          <div class="admin-form-group">
+            <label>Minimum Withdrawal Amount (USDT)</label>
+            <input type="number" id="setMinWithdraw" step="0.01" min="0.01">
+          </div>
+          <div class="admin-form-group">
+            <label>Referral Commission (%)</label>
+            <input type="number" id="setRefPercent" step="1" min="0" max="100">
+          </div>
+          <div class="admin-form-group">
+            <label>Site Name</label>
+            <input type="text" id="setSiteName">
+          </div>
+          <div class="admin-form-group">
+            <label>Admin Message (shown on user profiles)</label>
+            <textarea id="setAdminMessage" rows="4" placeholder="Message to all users..."></textarea>
+          </div>
+          <hr style="border-color:var(--border-color);margin:16px 0">
+          <div style="font-size:14px;font-weight:700;margin-bottom:12px">🤖 Telegram Bot Settings</div>
+          <div class="admin-form-group">
+            <label>Bot Token</label>
+            <input type="text" id="setBotToken" placeholder="8932261850:AAFDn7uS5yNkSVTWQ6b4_B-1y3lK-37y3ME">
+          </div>
+          <div class="admin-form-group">
+            <label>Admin Chat ID</label>
+            <input type="text" id="setAdminChatId" placeholder="7797816241">
+          </div>
+          <button class="btn btn-gold" onclick="saveAdminSettings()">💾 Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN MODAL -->
+  <div id="adminModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-title" id="adminModalTitle"></div>
+      <div class="modal-body" id="adminModalBody"></div>
+      <div class="modal-footer" id="adminModalFooter"></div>
+    </div>
+  </div>
+
+  <script src="js/db.js"></script>
+  <script src="js/telegram.js"></script>
+  <script src="js/bot.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

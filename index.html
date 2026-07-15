@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>EarnHub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== AUTH CONTAINER ===== -->
+  <div id="authContainer" class="auth-container">
+    <div class="auth-bg-particles">
+      <div class="auth-particle"></div><div class="auth-particle"></div>
+      <div class="auth-particle"></div><div class="auth-particle"></div>
+      <div class="auth-particle"></div><div class="auth-particle"></div>
+      <div class="auth-particle"></div><div class="auth-particle"></div>
+    </div>
+
+    <div class="auth-logo animate-float">EH</div>
+    <h1 class="auth-title">EarnHub</h1>
+    <p class="auth-subtitle">Complete Tasks & Earn USDT</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-form="login" onclick="showAuthForm('login')">Login</button>
+      <button class="auth-tab" data-form="register" onclick="showAuthForm('register')">Register</button>
+    </div>
+
+    <div id="authError" class="auth-error"></div>
+
+    <!-- LOGIN -->
+    <form id="loginForm" class="auth-form active" onsubmit="event.preventDefault(); handleLogin()">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="loginUsername" class="form-input" placeholder="Enter your username" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-gold btn-block">Login</button>
+    </form>
+
+    <!-- REGISTER -->
+    <form id="registerForm" class="auth-form" onsubmit="event.preventDefault(); handleRegister()">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="regUsername" class="form-input" placeholder="Choose a username" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPassword" class="form-input" placeholder="Choose a password" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Referral Code <span style="color:var(--text-muted)">(optional)</span></label>
+        <input type="text" id="regRef" class="form-input" placeholder="Enter referral code if any">
+      </div>
+      <button type="submit" class="btn btn-gold btn-block">Create Account</button>
+    </form>
+  </div>
+
+  <!-- ===== APP CONTAINER ===== -->
+  <div id="appContainer" style="display:none">
+    <div class="container">
+      <!-- HEADER -->
+      <div class="page-header">
+        <div class="header-left">
+          <div class="header-logo">EH</div>
+          <div class="header-title">EarnHub</div>
+        </div>
+        <div class="header-right">
+          <div class="balance-badge" onclick="navigateTo('profile')">
+            <span class="icon">💰</span>
+            <span id="headerBalance">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== HOME PAGE ===== -->
+      <div id="homePage" class="page-section">
+        <div class="welcome-banner animate-fade-in">
+          <div class="welcome-greeting">Welcome back,</div>
+          <div class="welcome-name" id="welcomeName">User</div>
+          <div class="welcome-balance-display">
+            <div>
+              <div class="balance-label">Total Balance</div>
+              <div class="balance-amount" id="welcomeBalance">$0.00</div>
+            </div>
+            <div style="margin-left:auto;text-align:right">
+              <div class="balance-label">USDT</div>
+              <div class="balance-usd">BEP20</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card animate-fade-in delay-1">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="statTasks">0</div>
+            <div class="stat-label">Tasks Done</div>
+          </div>
+          <div class="stat-card animate-fade-in delay-2">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value" id="statEarnings">$0.00</div>
+            <div class="stat-label">Total Earned</div>
+          </div>
+          <div class="stat-card animate-fade-in delay-3">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" id="statReferrals">0</div>
+            <div class="stat-label">Referrals</div>
+          </div>
+          <div class="stat-card animate-fade-in delay-4">
+            <div class="stat-icon">💸</div>
+            <div class="stat-value" id="statWithdrawn">$0.00</div>
+            <div class="stat-label">Withdrawn</div>
+          </div>
+        </div>
+
+        <div class="section-title" style="font-size:18px">Quick Tasks</div>
+        <div id="quickTasks"></div>
+
+        <div class="referral-card animate-fade-in" style="margin-top:16px">
+          <div class="referral-title">🔗 Your Referral Code</div>
+          <div class="referral-desc">Share your code and earn <span class="referral-commission">10%</span> commission on their earnings!</div>
+          <div class="copy-field">
+            <input type="text" id="homeRefLink" readonly style="flex:1;padding:10px 12px;background:transparent;border:none;color:var(--text-primary);font-weight:700;font-size:14px">
+            <button class="copy-btn" onclick="copyRefLink()">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== TASKS PAGE ===== -->
+      <div id="tasksPage" class="page-section">
+        <div class="section-title animate-fade-in">📋 Tasks</div>
+        <div class="section-subtitle animate-fade-in delay-1">Complete tasks and earn USDT rewards</div>
+
+        <div class="task-filters">
+          <button class="task-filter-btn active" data-filter="all" onclick="this.classList.add('active');document.querySelectorAll('.task-filter-btn').forEach(b=>b!==this&&b.classList.remove('active'));renderTasks('all')">All</button>
+          <button class="task-filter-btn" data-filter="available" onclick="this.classList.add('active');document.querySelectorAll('.task-filter-btn').forEach(b=>b!==this&&b.classList.remove('active'));renderTasks('available')">Available</button>
+          <button class="task-filter-btn" data-filter="completed" onclick="this.classList.add('active');document.querySelectorAll('.task-filter-btn').forEach(b=>b!==this&&b.classList.remove('active'));renderTasks('completed')">Completed</button>
+        </div>
+
+        <div id="tasksContainer"></div>
+      </div>
+
+      <!-- ===== ADS PAGE ===== -->
+      <div id="adsPage" class="page-section">
+        <div class="section-title animate-fade-in">📢 Advertisements</div>
+        <div class="section-subtitle animate-fade-in delay-1">Watch ads and earn extra USDT</div>
+        <div id="adsContainer"></div>
+      </div>
+
+      <!-- ===== PROFILE PAGE ===== -->
+      <div id="profilePage" class="page-section">
+        <div class="profile-header">
+          <div class="profile-avatar" id="profileBadge">U</div>
+          <div class="profile-name" id="profileName">User</div>
+          <div class="profile-username">EarnHub Member</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="profile-card">
+          <div class="profile-stats">
+            <div class="profile-stat-item">
+              <div class="profile-stat-value" id="profileBalance">$0.00</div>
+              <div class="profile-stat-label">Balance</div>
+            </div>
+            <div class="profile-stat-item">
+              <div class="profile-stat-value" id="profileTasks">0</div>
+              <div class="profile-stat-label">Completed</div>
+            </div>
+            <div class="profile-stat-item">
+              <div class="profile-stat-value" id="profileWithdrawn">$0.00</div>
+              <div class="profile-stat-label">Withdrawn</div>
+            </div>
+            <div class="profile-stat-item">
+              <div class="profile-stat-value" id="profileReferrals">0</div>
+              <div class="profile-stat-label">Referrals</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Referral -->
+        <div class="profile-card">
+          <div class="profile-section-title">🔗 Referral Program</div>
+          <div class="referral-desc" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+            Earn <span class="referral-commission">10%</span> commission on your referrals' earnings
+          </div>
+          <div class="copy-field" style="margin-bottom:8px">
+            <input type="text" id="profileRefLink" readonly>
+            <button class="copy-btn" onclick="copyRefLink()">Copy</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-secondary)">
+            <span>Referral Earnings:</span>
+            <span style="color:var(--accent-gold);font-weight:700" id="profileRefEarnings">$0.00</span>
+          </div>
+        </div>
+
+        <!-- Message Box -->
+        <div class="profile-card">
+          <div class="profile-section-title">📨 Message from Admin</div>
+          <div class="message-box" id="profileMessage">Loading...</div>
+        </div>
+
+        <!-- Gift Code -->
+        <div class="profile-card">
+          <div class="profile-section-title">🎁 Gift Code</div>
+          <div class="gift-code-input-group">
+            <input type="text" id="giftCodeInput" class="gift-code-input" placeholder="ENTER CODE" maxlength="20">
+            <button class="btn btn-gold" onclick="claimGiftCode()" style="white-space:nowrap;padding:12px 20px">Claim</button>
+          </div>
+        </div>
+
+        <!-- Withdraw -->
+        <div class="profile-card">
+          <div class="profile-section-title">💸 Withdraw USDT</div>
+          <div class="withdraw-section">
+            <div class="withdraw-input-group">
+              <label>USDT BEP20 Address</label>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="profileUsdtAddress" class="profile-input" placeholder="0x... or 0x0000...">
+                <button class="btn btn-gold btn-small" onclick="saveUsdtAddress()" style="white-space:nowrap">Save</button>
+              </div>
+            </div>
+            <button class="btn btn-gold btn-block" onclick="requestWithdraw()">Request Withdrawal</button>
+            <div style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:8px">
+              Minimum withdrawal: $1.00 USDT
+            </div>
+          </div>
+        </div>
+
+        <!-- Withdraw History -->
+        <div class="profile-card">
+          <div class="profile-section-title">📜 Withdrawal History</div>
+          <div id="withdrawHistory"></div>
+        </div>
+
+        <button class="btn btn-outline btn-block" onclick="logout()" style="margin-top:16px;color:var(--accent-red);border-color:var(--accent-red)">Logout</button>
+      </div>
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-page="home" onclick="navigateTo('home')">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
+      </button>
+      <button class="nav-item" data-page="tasks" onclick="navigateTo('tasks')">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Tasks</span>
+      </button>
+      <button class="nav-item" data-page="ads" onclick="navigateTo('ads')">
+        <span class="nav-icon">📢</span>
+        <span class="nav-label">Ads</span>
+      </button>
+      <button class="nav-item" data-page="profile" onclick="navigateTo('profile')">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">Profile</span>
+      </button>
+    </nav>
+
+    <!-- WITHDRAW MODAL -->
+    <div id="withdrawModal" class="modal-overlay" onclick="if(event.target===this)closeModal('withdrawModal')">
+      <div class="modal">
+        <div class="modal-title" id="withdrawModalTitle">Withdraw</div>
+        <div class="modal-body" id="withdrawModalBody"></div>
+        <div class="modal-footer" id="withdrawModalFooter"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/db.js"></script>
+  <script src="js/telegram.js"></script>
+  <script src="js/bot.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
