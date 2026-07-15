@@ -346,6 +346,10 @@
             <div class="admin-form-group"><label>Min Withdraw (USDT)</label><input type="number" id="miniSetMinWD" step="0.01"></div>
             <div class="admin-form-group"><label>Referral %</label><input type="number" id="miniSetRef" step="1"></div>
             <div class="admin-form-group"><label>Admin Message</label><textarea id="miniSetMsg" rows="3"></textarea></div>
+            <hr style="border-color:var(--border-color);margin:12px 0">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--accent-gold)">📢 Ad Settings</div>
+            <div class="admin-form-group"><label>Max Ads Per User (daily)</label><input type="number" id="miniSetAdCount" min="1" max="100" step="1"></div>
+            <div class="admin-form-group"><label>Ad Watch Timer (seconds)</label><input type="number" id="miniSetAdTimer" min="1" max="60" step="1"></div>
             <button class="btn btn-gold btn-small" onclick="miniSaveSettings()">💾 Save</button>
           </div>
         </div>

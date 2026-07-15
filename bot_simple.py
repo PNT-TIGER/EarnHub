@@ -1,4 +1,5 @@
-import os, json, time, requests
+import os, json, time, requests, sys
+from threading import Thread
 
 BOT_TOKEN = "8932261850:AAG4791Hk4YxFtvISzoot_cKvcfok49snRI"
 ADMIN_IDS = ["7797816241"]
@@ -7,6 +8,7 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "earnhub_data.json")
 
 users_db = {}
 tasks_db = []
+admin_states = {}
 
 def load_data():
     global users_db, tasks_db
@@ -21,190 +23,121 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump({"users": users_db, "tasks": tasks_db}, f)
 
-def send_msg(chat_id, text, markup=None):
-    data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    if markup:
-        data["reply_markup"] = json.dumps(markup)
+def api(method, **kwargs):
     try:
-        return requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json=data, timeout=10).json()
+        r = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/{method}",
+            json=kwargs, timeout=15)
+        return r.json()
     except: return None
-
-def edit_msg(chat_id, msg_id, text, markup=None):
-    data = {"chat_id": chat_id, "message_id": msg_id, "text": text, "parse_mode": "HTML"}
-    if markup:
-        data["reply_markup"] = json.dumps(markup)
-    try:
-        return requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText", json=data, timeout=10).json()
-    except: return None
-
-def answer_cb(cb_id, text=""):
-    try:
-        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery",
-            json={"callback_query_id": cb_id, "text": text, "show_alert": False}, timeout=5)
-    except: pass
 
 load_data()
-print("Bot started!")
+print("Bot running!", flush=True)
 
-# Store admin states: {chat_id: {"action": "broadcast|select_user", "state": "awaiting_msg", "target": None}}
-admin_states = {}
-
-last_update_id = 0
+last_id = 0
 while True:
     try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
-        params = {"offset": last_update_id + 1, "timeout": 30}
-        r = requests.get(url, params=params, timeout=35)
+        r = requests.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
+            params={"offset": last_id + 1, "timeout": 10}, timeout=15)
         data = r.json()
-        if not data.get("ok"):
-            time.sleep(3); continue
+        if not data.get("ok"): continue
 
-        for update in data.get("result", []):
-            last_update_id = update["update_id"]
+        for upd in data.get("result", []):
+            last_id = upd["update_id"]
 
-            # ---- CALLBACK QUERY ----
-            cb = update.get("callback_query")
+            # Callback
+            cb = upd.get("callback_query")
             if cb:
-                cb_data = cb.get("data", "")
-                cb_id = cb["id"]
                 cid = str(cb["message"]["chat"]["id"])
+                dta = cb["data"]
                 mid = cb["message"]["message_id"]
-
                 if cid not in ADMIN_IDS:
-                    answer_cb(cb_id, "Access denied")
+                    api("answerCallbackQuery", callback_query_id=cb["id"])
                     continue
 
-                if cb_data == "admin_panel":
-                    answer_cb(cb_id)
-                    markup = {
-                        "inline_keyboard": [
-                            [{"text": "📢 Broadcast to All Users", "callback_data": "admin_broadcast"}],
-                            [{"text": "👥 View All Users", "callback_data": "admin_list_users"}],
-                            [{"text": "💬 Send to Specific User", "callback_data": "admin_select_user"}],
+                if dta == "admin_panel":
+                    api("editMessageText", chat_id=cid, message_id=mid,
+                        text="⚙️ <b>Admin Panel</b>", parse_mode="HTML",
+                        reply_markup=json.dumps({"inline_keyboard": [
+                            [{"text": "📢 Broadcast", "callback_data": "admin_broadcast"}],
+                            [{"text": "👥 All Users", "callback_data": "admin_list"}],
+                            [{"text": "💬 Send to User", "callback_data": "admin_send"}],
                             [{"text": "🔙 Close", "callback_data": "admin_close"}]
-                        ]
-                    }
-                    edit_msg(cid, mid, "⚙️ <b>Admin Panel</b>\n\nChoose an option:", markup)
-
-                elif cb_data == "admin_broadcast":
-                    answer_cb(cb_id, "Send your message now")
-                    admin_states[cid] = {"action": "broadcast"}
-                    edit_msg(cid, mid,
-                        "📢 <b>Broadcast to All Users</b>\n\n"
-                        "Send the message you want to broadcast to ALL users.\n\n"
-                        "Type your message below and send it as a normal message.\n"
-                        "Or click Cancel to go back.",
-                        {"inline_keyboard": [[{"text": "🔙 Cancel", "callback_data": "admin_panel"}]]}
-                    )
-
-                elif cb_data == "admin_list_users":
-                    answer_cb(cb_id)
-                    if not users_db:
-                        edit_msg(cid, mid, "👥 No users registered yet.", {"inline_keyboard": [[{"text": "🔙 Back", "callback_data": "admin_panel"}]]})
-                    else:
-                        lines = ["👥 <b>All Users:</b>\n"]
-                        for uid, u in sorted(users_db.items(), key=lambda x: x[1].get("balance", 0), reverse=True):
-                            name = u.get("first_name", "?") or u.get("telegram_username", "?")
-                            bal = u.get("balance", 0)
-                            ref = u.get("referral_code", "")
-                            lines.append(f"• {name} (@{u.get('telegram_username','')})")
-                            lines.append(f"  ID: <code>{uid}</code> | 💰 ${bal:.2f} | Ref: {ref}")
-                        text = "\n".join(lines)
-                        # Split if too long
-                        if len(text) > 4000:
-                            text = text[:4000] + "\n\n... (truncated)"
-                        edit_msg(cid, mid, text, {"inline_keyboard": [[{"text": "🔙 Back", "callback_data": "admin_panel"}]]})
-
-                elif cb_data == "admin_select_user":
-                    answer_cb(cb_id)
-                    lines = ["💬 <b>Send to Specific User</b>\n\nChoose a user or send their chat ID:\n"]
-                    for uid, u in list(users_db.items())[:30]:
-                        name = u.get("first_name", "?") or u.get("telegram_username", "?")
-                        lines.append(f"• <code>{uid}</code> - {name}")
-                    text = "\n".join(lines)
-                    if len(text) > 4000:
-                        text = text[:4000] + "\n\n... (truncated)"
-                    admin_states[cid] = {"action": "select_user"}
-                    edit_msg(cid, mid,
-                        text + "\n\nSend the chat ID of the user you want to message:",
-                        {"inline_keyboard": [[{"text": "🔙 Cancel", "callback_data": "admin_panel"}]]}
-                    )
-
-                elif cb_data == "admin_close":
-                    answer_cb(cb_id, "Closed")
-                    try:
-                        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage",
-                            json={"chat_id": cid, "message_id": mid}, timeout=5)
-                    except: pass
-
+                        ]}))
+                elif dta == "admin_list":
+                    lines = ["👥 <b>All Users:</b>\n"]
+                    for uid, u in users_db.items():
+                        lines.append(f"• {u.get('first_name','?')} (@{u.get('telegram_username','')})")
+                        lines.append(f"  ID: <code>{uid}</code> | 💰 ${u.get('balance',0):.2f}")
+                    text = "\n".join(lines)[:4000]
+                    api("editMessageText", chat_id=cid, message_id=mid,
+                        text=text, parse_mode="HTML",
+                        reply_markup=json.dumps({"inline_keyboard": [[{"text":"🔙 Back","callback_data":"admin_panel"}]]}))
+                elif dta == "admin_broadcast":
+                    admin_states[cid] = "broadcast"
+                    api("editMessageText", chat_id=cid, message_id=mid,
+                        text="📢 Send your broadcast message now:",
+                        reply_markup=json.dumps({"inline_keyboard": [[{"text":"🔙 Cancel","callback_data":"admin_panel"}]]}))
+                elif dta == "admin_send":
+                    admin_states[cid] = "send_user"
+                    lines = ["💬 Send the user's Chat ID:\n"]
+                    for uid, u in list(users_db.items())[:15]:
+                        lines.append(f"<code>{uid}</code> - {u.get('first_name','?')}")
+                    api("editMessageText", chat_id=cid, message_id=mid,
+                        text="\n".join(lines)[:4000], parse_mode="HTML",
+                        reply_markup=json.dumps({"inline_keyboard": [[{"text":"🔙 Cancel","callback_data":"admin_panel"}]]}))
+                elif dta == "admin_close":
+                    api("deleteMessage", chat_id=cid, message_id=mid)
+                api("answerCallbackQuery", callback_query_id=cb["id"])
                 continue
 
-            # ---- REGULAR MESSAGES ----
-            msg = update.get("message")
+            # Message
+            msg = upd.get("message")
             if not msg: continue
             chat_id = str(msg["chat"]["id"])
             text = msg.get("text", "")
             user = msg.get("from", {})
 
-            # ---- ADMIN MESSAGE HANDLING ----
+            # Admin state handling
             if chat_id in ADMIN_IDS and chat_id in admin_states:
-                state = admin_states[chat_id]
-
-                if state["action"] == "broadcast":
-                    if text:
-                        success = 0
-                        fail = 0
-                        for uid in users_db:
-                            if send_msg(uid, f"📢 <b>Admin Broadcast</b>\n\n{text}"):
-                                success += 1
-                            else:
-                                fail += 1
-                            time.sleep(0.05)
-                        send_msg(chat_id, f"✅ Broadcast sent!\n✓ Delivered: {success}\n✗ Failed: {fail}")
-                    del admin_states[chat_id]
-                    continue
-
-                elif state["action"] == "select_user":
-                    target_id = text.strip()
-                    if target_id in users_db:
-                        admin_states[chat_id] = {"action": "msg_user", "target": target_id}
-                        u = users_db[target_id]
-                        send_msg(chat_id,
-                            f"✅ Selected: {u.get('first_name','?')} (@{u.get('telegram_username','')})\n"
-                            f"Balance: ${u.get('balance',0):.2f}\n\n"
-                            f"Now send the message for this user:",
-                            {"inline_keyboard": [[{"text": "🔙 Cancel", "callback_data": "admin_panel"}]]}
-                        )
+                state = admin_states.pop(chat_id)
+                if state == "broadcast" and text:
+                    ok = 0
+                    for uid in users_db:
+                        if api("sendMessage", chat_id=uid,
+                            text=f"📢 <b>Admin Broadcast</b>\n\n{text}", parse_mode="HTML"):
+                            ok += 1
+                        time.sleep(0.05)
+                    api("sendMessage", chat_id=chat_id,
+                        text=f"✅ Broadcast sent to {ok}/{len(users_db)} users")
+                elif state == "send_user" and text:
+                    target = text.strip()
+                    if target in users_db:
+                        admin_states[chat_id] = ("send_msg", target)
+                        u = users_db[target]
+                        api("sendMessage", chat_id=chat_id,
+                            text=f"✅ Selected {u.get('first_name','?')}\nNow send the message:",
+                            reply_markup=json.dumps({"inline_keyboard":[[{"text":"🔙 Cancel","callback_data":"admin_panel"}]]}))
                     else:
-                        send_msg(chat_id, "❌ User not found! Send a valid chat ID from the list above.")
-                    continue
+                        api("sendMessage", chat_id=chat_id,
+                            text="❌ User not found! Send a valid Chat ID.")
+                elif isinstance(admin_states.get(chat_id), tuple) and admin_states[chat_id][0] == "send_msg":
+                    target = admin_states.pop(chat_id)[1]
+                    if api("sendMessage", chat_id=target,
+                        text=f"💬 <b>Message from Admin</b>\n\n{text}", parse_mode="HTML"):
+                        api("sendMessage", chat_id=chat_id, text="✅ Sent!")
+                    else:
+                        api("sendMessage", chat_id=chat_id, text="❌ Failed")
+                continue
 
-                elif state["action"] == "msg_user":
-                    target = state.get("target")
-                    if target and text:
-                        u = users_db.get(target)
-                        name = u.get("first_name", "User") if u else "User"
-                        ok = send_msg(target, f"💬 <b>Message from Admin</b>\n\n{text}")
-                        if ok:
-                            send_msg(chat_id, f"✅ Message sent to {name} (ID: {target})")
-                        else:
-                            send_msg(chat_id, f"❌ Failed to send to {target}")
-                    del admin_states[chat_id]
-                    continue
-
-            # ---- /START ----
+            # /start
             if text == "/start" or text.startswith("/start "):
                 args = text.replace("/start", "").strip()
-                is_new = False
-
-                if chat_id not in users_db:
-                    is_new = True
+                is_new = chat_id not in users_db
+                if is_new:
                     users_db[chat_id] = {
                         "chat_id": msg["chat"]["id"],
                         "telegram_username": user.get("username") or user.get("first_name", ""),
                         "first_name": user.get("first_name", ""),
-                        "username": f"tg_{user['id']}",
-                        "password": f"pass_{user['id']}",
                         "balance": 0.01,
                         "referral_code": str(user["id"]),
                         "referred_by": "",
@@ -220,39 +153,27 @@ while True:
                                 u["balance"] = u.get("balance", 0) + 0.1
                                 break
                     save_data()
-
-                name = user.get("first_name", "User")
-                if is_new:
-                    response = (
-                        f"✨ <b>Welcome to EarnHub, {name}!</b> ✨\n\n"
-                        f"🎉 <b>Welcome Bonus: +0.01 USDT</b> added!\n\n"
-                        f"📌 Complete tasks & earn USDT\n"
-                        f"💰 Min withdraw: $1 USDT (BEP20)\n"
-                        f"👥 Invite friends = 10% commission\n\n"
-                        f"👇 Click below to start earning!"
-                    )
+                    api("sendMessage", chat_id=chat_id,
+                        text=f"✨ <b>Welcome to EarnHub, {user.get('first_name','User')}!</b> ✨\n\n🎉 <b>+0.01 USDT</b> Welcome Bonus added!\n\n👇 Open Mini App:",
+                        parse_mode="HTML",
+                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","url":MINI_APP_URL}]]}))
                 else:
-                    response = f"👋 <b>Welcome to EarnHub, {name}!</b>"
+                    api("sendMessage", chat_id=chat_id,
+                        text=f"👋 <b>Welcome to EarnHub, {user.get('first_name','User')}!</b>",
+                        parse_mode="HTML",
+                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","url":MINI_APP_URL}]]}))
 
-                markup = {
-                    "inline_keyboard": [
-                        [{"text": "🚀 Open Mini App", "url": MINI_APP_URL}]
-                    ]
-                }
-                send_msg(chat_id, response, markup)
-
-            # ---- /ADMIN ----
+            # /admin
             elif text == "/admin" and chat_id in ADMIN_IDS:
-                markup = {
-                    "inline_keyboard": [
-                        [{"text": "📢 Broadcast to All Users", "callback_data": "admin_broadcast"}],
-                        [{"text": "👥 View All Users", "callback_data": "admin_list_users"}],
-                        [{"text": "💬 Send to Specific User", "callback_data": "admin_select_user"}],
+                api("sendMessage", chat_id=chat_id,
+                    text="⚙️ <b>Admin Panel</b>", parse_mode="HTML",
+                    reply_markup=json.dumps({"inline_keyboard": [
+                        [{"text": "📢 Broadcast", "callback_data": "admin_broadcast"}],
+                        [{"text": "👥 All Users", "callback_data": "admin_list"}],
+                        [{"text": "💬 Send to User", "callback_data": "admin_send"}],
                         [{"text": "🔙 Close", "callback_data": "admin_close"}]
-                    ]
-                }
-                send_msg(chat_id, "⚙️ <b>Admin Panel</b>\n\nChoose an option:", markup)
+                    ]}))
 
     except Exception as e:
-        print(f"Error: {e}")
-        time.sleep(5)
+        print(f"Error: {e}", flush=True)
+        time.sleep(3)

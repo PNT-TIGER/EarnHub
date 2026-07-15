@@ -383,12 +383,32 @@ function claimTask(taskId) {
 function renderAds() {
   const container = $('adsContainer');
   const ads = DB.get('ads', []).filter(a => a.active !== false);
+  const settings = DB.get('settings', {});
+  const maxAds = settings.maxAdsPerUser || 10;
+  const adTimer = settings.adTimer || 6;
+  if (!currentUser.watchedAds) currentUser.watchedAds = {};
+  const today = new Date().toDateString();
+  if (!currentUser.watchedAds[today]) currentUser.watchedAds[today] = [];
+  const todayCount = currentUser.watchedAds[today].length;
+
   if (ads.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📢</div><p>No ads available. Check back later!</p></div>';
     return;
   }
   container.innerHTML = '';
+
+  if (todayCount >= maxAds) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><p>You've watched all ${maxAds} ads for today! Come back tomorrow.</p></div>`;
+    return;
+  }
+
+  const remaining = maxAds - todayCount;
+  container.innerHTML = `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">📊 Today: ${todayCount}/${maxAds} ads watched</div>`;
+
   ads.forEach((ad, i) => {
+    const alreadyWatched = currentUser.watchedAds[today].includes(ad.id);
+    if (alreadyWatched) return;
+
     const card = el('div', {
       className: 'ad-card',
       style: `animation-delay: ${i * 0.1}s`
@@ -402,25 +422,83 @@ function renderAds() {
         ad.description ? el('div', { style: 'font-size:13px;color:var(--text-secondary);margin-bottom:12px' }, ad.description) : null,
         el('button', {
           className: 'ad-btn',
-          onclick: () => {
-            if (ad.link) {
-              window.open(ad.link, '_blank');
-              setTimeout(() => {
-                currentUser.balance += ad.payout;
-                saveCurrentUser();
-                updateHeader();
-                showToast(`+${ad.payout} USDT from ad! 🎉`, 'success');
-                showConfetti();
-              }, 2000);
-            } else {
-              showToast('Ad link not available', 'error');
-            }
-          }
-        }, '👀 View Ad - Earn ' + ad.payout + ' USDT')
+          onclick: () => startAdTimer(ad)
+        }, '👀 Watch Ad - ' + adTimer + 's')
       )
     );
     container.appendChild(card);
   });
+}
+
+let activeAdTimer = null;
+
+function startAdTimer(ad) {
+  if (activeAdTimer) {
+    showToast('Already watching an ad!', 'error');
+    return;
+  }
+  const settings = DB.get('settings', {});
+  const adTimer = settings.adTimer || 6;
+
+  if (!ad.link) { showToast('Ad link not available', 'error'); return; }
+
+  const modal = $('withdrawModal');
+  $('withdrawModalTitle').textContent = '👀 Watch Ad';
+  $('withdrawModalBody').innerHTML = `
+    <div style="text-align:center;padding:20px">
+      <div style="font-size:48px;margin-bottom:12px">📢</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:8px">${ad.title}</div>
+      <div style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">💰 +${ad.payout} USDT</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Please wait... Do not close!</div>
+      <div style="font-size:14px;color:var(--accent-gold);font-weight:700;margin-bottom:8px">
+        <span id="adTimerDisplay">${adTimer}</span>s remaining
+      </div>
+      <div style="width:100%;height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden">
+        <div id="adTimerBar" style="height:100%;width:100%;background:var(--gradient-gold);border-radius:3px;transition:width 1s linear"></div>
+      </div>
+    </div>
+  `;
+  $('withdrawModalFooter').innerHTML = `<button class="btn btn-outline btn-small" onclick="cancelAdTimer()">✕ Close</button>`;
+  modal.classList.add('active');
+
+  window.open(ad.link, '_blank');
+
+  let remaining = adTimer;
+  const display = $('adTimerDisplay');
+  const bar = $('adTimerBar');
+  let cancelled = false;
+
+  activeAdTimer = setInterval(() => {
+    remaining--;
+    if (display) display.textContent = remaining;
+    if (bar) bar.style.width = (remaining / adTimer * 100) + '%';
+    if (remaining <= 0) {
+      clearInterval(activeAdTimer);
+      activeAdTimer = null;
+      if (!cancelled) {
+        if (!currentUser.watchedAds) currentUser.watchedAds = {};
+        const today = new Date().toDateString();
+        if (!currentUser.watchedAds[today]) currentUser.watchedAds[today] = [];
+        currentUser.watchedAds[today].push(ad.id);
+        currentUser.balance += ad.payout;
+        saveCurrentUser();
+        updateHeader();
+        closeModal('withdrawModal');
+        showToast(`+${ad.payout} USDT from ad! 🎉`, 'success');
+        sendTelegramMessage(`<b>📢 Ad Watched</b>\n\n<b>User:</b> ${currentUser.username}\n<b>Ad:</b> ${ad.title}\n<b>Earned:</b> +${ad.payout} USDT`);
+        renderAds();
+      }
+    }
+  }, 1000);
+}
+
+function cancelAdTimer() {
+  if (activeAdTimer) {
+    clearInterval(activeAdTimer);
+    activeAdTimer = null;
+  }
+  closeModal('withdrawModal');
+  showToast('❌ Ad cancelled! No reward added.', 'error');
 }
 
 // ===== PROFILE =====
@@ -884,20 +962,26 @@ function miniAddBalance(userId) {
   const users = DB.get('users', []); const user = users.find(u => u.id === userId);
   if (!user) return;
   const m = $('withdrawModal');
-  $('withdrawModalTitle').textContent = '💰 Add Balance - ' + user.username;
-  $('withdrawModalBody').innerHTML = `<div class="admin-form-group"><label>Amount (USDT)</label><input type="number" id="miniAddBalAmt" class="form-input" step="0.01"></div>`;
+  $('withdrawModalTitle').textContent = '💰 Edit Balance - ' + user.username;
+  $('withdrawModalBody').innerHTML = `
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Current Balance: <span style="color:var(--accent-gold);font-weight:700">$${user.balance.toFixed(2)}</span></div>
+    <div class="admin-form-group"><label>Set Balance (USDT)</label><input type="number" id="miniAddBalAmt" class="form-input" step="0.01" value="${user.balance}"></div>
+    <div style="font-size:12px;color:var(--text-muted)">Enter new balance amount. Can be higher or lower than current.</div>`;
   $('withdrawModalFooter').innerHTML = `<button class="btn btn-outline btn-small" onclick="closeModal('withdrawModal')">Cancel</button>
-    <button class="btn btn-success btn-small" onclick="miniConfirmAddBal('${userId}')">Add</button>`;
+    <button class="btn btn-success btn-small" onclick="miniConfirmAddBal('${userId}')">💾 Set</button>`;
   m.classList.add('active');
 }
 
 function miniConfirmAddBal(userId) {
   const amt = parseFloat($('miniAddBalAmt').value);
-  if (!amt || amt <= 0) { showToast('Enter valid amount', 'error'); return; }
+  if (amt === undefined || amt < 0 || isNaN(amt)) { showToast('Enter valid amount', 'error'); return; }
   let users = DB.get('users', []); const user = users.find(u => u.id === userId);
-  if (user) { user.balance += amt; DB.set('users', users); closeModal('withdrawModal');
-    showToast(`+$${amt} to ${user.username}`, 'success');
-    sendTelegramMessage(`<b>💰 Balance Added</b>\n\n<b>User:</b> ${user.username}\n<b>Amount:</b> +${amt} USDT`);
+  if (user) {
+    const diff = amt - user.balance;
+    user.balance = amt;
+    DB.set('users', users); closeModal('withdrawModal');
+    showToast(`✅ Balance set to $${amt} for ${user.username}`, 'success');
+    sendTelegramMessage(`<b>💰 Balance Updated</b>\n\n<b>User:</b> ${user.username}\n<b>New Balance:</b> $${amt}\n<b>Change:</b> ${diff >= 0 ? '+' : ''}${diff.toFixed(2)} USDT`);
     loadMiniUsers(); loadMiniDashboard(); }
 }
 
@@ -983,10 +1067,20 @@ function loadMiniSettings() {
   $('miniSetMinWD').value = s.minWithdraw || 1;
   $('miniSetRef').value = s.refPercent || 10;
   $('miniSetMsg').value = s.adminMessage || '';
+  if ($('miniSetAdCount')) $('miniSetAdCount').value = s.maxAdsPerUser || 10;
+  if ($('miniSetAdTimer')) $('miniSetAdTimer').value = s.adTimer || 6;
 }
 
 function miniSaveSettings() {
-  const s = { minWithdraw: parseFloat($('miniSetMinWD').value) || 1, refPercent: parseFloat($('miniSetRef').value) || 10, siteName: 'EarnHub', adminMessage: $('miniSetMsg').value.trim(), botToken: BOT_TOKEN, adminChatId: ADMIN_CHAT_ID };
+  const s = {
+    minWithdraw: parseFloat($('miniSetMinWD').value) || 1,
+    refPercent: parseFloat($('miniSetRef').value) || 10,
+    siteName: 'EarnHub',
+    adminMessage: $('miniSetMsg').value.trim(),
+    maxAdsPerUser: parseInt($('miniSetAdCount')?.value) || 10,
+    adTimer: parseInt($('miniSetAdTimer')?.value) || 6,
+    botToken: BOT_TOKEN, adminChatId: ADMIN_CHAT_ID
+  };
   DB.set('settings', s); showToast('Settings saved!', 'success');
 }
 
