@@ -424,6 +424,30 @@ function renderAds() {
 }
 
 // ===== PROFILE =====
+function loadTelegramProfilePic() {
+  const tgId = currentUser.telegramId || currentUser.telegramChatId;
+  if (!tgId) return;
+  const { token } = getBotSettings();
+  if (!token) return;
+  fetch(`https://api.telegram.org/bot${token}/getUserProfilePhotos?user_id=${tgId}&limit=1`)
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok && d.result?.photos?.length > 0) {
+        const fileId = d.result.photos[0][0].file_id;
+        fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`)
+          .then(r2 => r2.json())
+          .then(d2 => {
+            if (d2.ok && d2.result?.file_path) {
+              const url = `https://api.telegram.org/file/bot${token}/${d2.result.file_path}`;
+              const img = $('profileAvatarImg');
+              const letter = $('profileAvatarLetter');
+              if (img) { img.src = url; img.style.display = 'inline'; if (letter) letter.style.display = 'none'; }
+            }
+          }).catch(() => {});
+      }
+    }).catch(() => {});
+}
+
 function renderProfile() {
   if (!currentUser) return;
   const tgName = currentUser.telegramName || currentUser.telegramUsername || currentUser.username;
@@ -431,6 +455,7 @@ function renderProfile() {
   $('profileAvatarLetter').textContent = tgName.charAt(0).toUpperCase();
   $('profileAvatarImg').style.display = 'none';
   $('profileAvatarLetter').style.display = 'inline';
+  loadTelegramProfilePic();
   if (currentUser.telegramUsername) {
     $('profileTgUsername').textContent = '@' + currentUser.telegramUsername;
   } else {
