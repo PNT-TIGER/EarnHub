@@ -426,8 +426,16 @@ function renderAds() {
 // ===== PROFILE =====
 function renderProfile() {
   if (!currentUser) return;
-  $('profileName').textContent = currentUser.username;
-  $('profileBadge').textContent = currentUser.username.charAt(0).toUpperCase();
+  const tgName = currentUser.telegramName || currentUser.telegramUsername || currentUser.username;
+  $('profileName').textContent = tgName;
+  $('profileAvatarLetter').textContent = tgName.charAt(0).toUpperCase();
+  $('profileAvatarImg').style.display = 'none';
+  $('profileAvatarLetter').style.display = 'inline';
+  if (currentUser.telegramUsername) {
+    $('profileTgUsername').textContent = '@' + currentUser.telegramUsername;
+  } else {
+    $('profileTgUsername').textContent = currentUser.email ? '✉️ ' + currentUser.email : 'EarnHub Member';
+  }
   $('profileBalance').textContent = '$' + currentUser.balance.toFixed(2);
   $('profileTasks').textContent = currentUser.completedTasks.length;
   $('profileWithdrawn').textContent = '$' + currentUser.totalWithdrawn.toFixed(2);
@@ -982,11 +990,84 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ===== AUTO-REGISTER FROM TELEGRAM =====
+function autoRegisterFromTelegram() {
+  const tgUser = TelegramApp.getUser();
+  if (!tgUser) return false;
+
+  let users = DB.get('users', []);
+  let user = users.find(u => u.telegramId == tgUser.id || u.telegramChatId == tgUser.id);
+
+  if (user) {
+    user.telegramUsername = tgUser.username || user.telegramUsername;
+    user.telegramName = tgUser.first_name || user.telegramName;
+    currentUser = user;
+    localStorage.setItem('earnhub_session', JSON.stringify({ userId: user.id }));
+    DB.set('users', users);
+    return true;
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const refParam = urlParams.get('ref') || urlParams.get('start');
+  let referredBy = '';
+  if (refParam) {
+    const referrer = users.find(u => u.telegramId == refParam || u.telegramChatId == refParam || u.referralCode == refParam);
+    if (referrer) referredBy = referrer.id;
+  }
+
+  const newUser = {
+    id: uid(),
+    username: tgUser.username || 'tg_' + tgUser.id,
+    password: 'tg_' + tgUser.id + '_pass',
+    email: '',
+    phone: '',
+    telegramId: tgUser.id,
+    telegramUsername: tgUser.username || null,
+    telegramName: tgUser.first_name || null,
+    telegramChatId: tgUser.id,
+    balance: 0,
+    completedTasks: [],
+    claimedTasks: [],
+    taskScreenshots: {},
+    totalWithdrawn: 0,
+    usdtAddress: '',
+    referredBy: referredBy,
+    referralCode: String(tgUser.id),
+    referrals: [],
+    referralEarnings: 0,
+    createdAt: new Date().toISOString(),
+    giftCodesRedeemed: []
+  };
+
+  if (referredBy) {
+    const referrer = users.find(u => u.id === referredBy);
+    if (referrer) {
+      if (!referrer.referrals) referrer.referrals = [];
+      if (!referrer.referrals.includes(newUser.id)) referrer.referrals.push(newUser.id);
+    }
+  }
+
+  users.push(newUser);
+  DB.set('users', users);
+  currentUser = newUser;
+  localStorage.setItem('earnhub_session', JSON.stringify({ userId: newUser.id }));
+  notifyNewUser(newUser);
+  return true;
+}
+
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   TelegramApp.init();
 
   fetchDataFromTelegram(() => {
+    if (autoRegisterFromTelegram()) {
+      $('authContainer').style.display = 'none';
+      $('appContainer').style.display = 'block';
+      updateHeader();
+      navigateTo('home');
+      return;
+    }
+
     const session = JSON.parse(localStorage.getItem('earnhub_session') || 'null');
     if (session) {
       const users = DB.get('users', []);
@@ -1001,13 +1082,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
     $('authContainer').style.display = 'flex';
-    $('appContainer').style.display = 'none';
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const refParam = urlParams.get('ref');
-    if (refParam) {
-      $('regRef').value = refParam;
-      showToast('Referral code detected! Complete registration to join', 'info');
-    }
+    $('appContainer').style.display = 'block';
   });
 });

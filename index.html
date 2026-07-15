@@ -11,62 +11,31 @@
 <body>
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- ===== AUTH CONTAINER ===== -->
-  <div id="authContainer" class="auth-container">
+  <!-- ===== AUTH CONTAINER (fallback only) ===== -->
+  <div id="authContainer" class="auth-container" style="display:none">
     <div class="auth-bg-particles">
       <div class="auth-particle"></div><div class="auth-particle"></div>
       <div class="auth-particle"></div><div class="auth-particle"></div>
       <div class="auth-particle"></div><div class="auth-particle"></div>
       <div class="auth-particle"></div><div class="auth-particle"></div>
     </div>
-
     <div class="auth-logo animate-float"><img src="https://i.ibb.co.com/BKc6LDRQ/Gemini-Generated-Image-ua4lajua4lajua4l.png" alt="EarnHub" style="width:100%;height:100%;border-radius:50%;object-fit:cover"></div>
     <h1 class="auth-title">EarnHub</h1>
-    <p class="auth-subtitle">Complete Tasks & Earn USDT</p>
-
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-form="login" onclick="showAuthForm('login')">Login</button>
-      <button class="auth-tab" data-form="register" onclick="showAuthForm('register')">Register</button>
-    </div>
-
+    <p class="auth-subtitle">Please open from Telegram Bot</p>
     <div id="authError" class="auth-error"></div>
-
-    <!-- LOGIN -->
-    <form id="loginForm" class="auth-form active" onsubmit="event.preventDefault(); handleLogin()">
+    <form id="loginForm" class="auth-form active" onsubmit="event.preventDefault(); handleLogin()" style="max-width:320px">
       <div class="form-group">
         <label>Username</label>
-        <input type="text" id="loginUsername" class="form-input" placeholder="Enter your username" autocomplete="username">
+        <input type="text" id="loginUsername" class="form-input" placeholder="Username">
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password">
+        <input type="password" id="loginPassword" class="form-input" placeholder="Password">
       </div>
       <button type="submit" class="btn btn-gold btn-block">Login</button>
-    </form>
-
-    <!-- REGISTER -->
-    <form id="registerForm" class="auth-form" onsubmit="event.preventDefault(); handleRegister()">
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="regUsername" class="form-input" placeholder="Choose a username" autocomplete="off">
+      <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text-muted)">
+        🤖 Open from <a href="https://t.me/earn_hub_task_bot" style="color:var(--accent-gold)">@earn_hub_task_bot</a> for auto-login
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="regPassword" class="form-input" placeholder="Choose a password" autocomplete="new-password">
-      </div>
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="regEmail" class="form-input" placeholder="Enter your email">
-      </div>
-      <div class="form-group">
-        <label>Phone Number</label>
-        <input type="tel" id="regPhone" class="form-input" placeholder="Enter your phone number">
-      </div>
-      <div class="form-group">
-        <label>Referral Code <span style="color:var(--text-muted)">(optional)</span></label>
-        <input type="text" id="regRef" class="form-input" placeholder="Enter referral code if any">
-      </div>
-      <button type="submit" class="btn btn-gold btn-block">Create Account</button>
     </form>
   </div>
 
@@ -171,9 +140,12 @@
       <!-- ===== PROFILE PAGE ===== -->
       <div id="profilePage" class="page-section">
         <div class="profile-header">
-          <div class="profile-avatar" id="profileBadge">U</div>
+          <div class="profile-avatar" id="profileBadge">
+            <img id="profileAvatarImg" src="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:none">
+            <span id="profileAvatarLetter">U</span>
+          </div>
           <div class="profile-name" id="profileName">User</div>
-          <div class="profile-username">EarnHub Member</div>
+          <div class="profile-username" id="profileTgUsername">EarnHub Member</div>
         </div>
 
         <!-- Stats -->
