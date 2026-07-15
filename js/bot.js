@@ -22,6 +22,8 @@ function notifyNewUser(user) {
   sendTelegramMessage(
     `<b>🆕 New User Registered</b>\n\n` +
     `<b>Username:</b> ${user.username}\n` +
+    `<b>Email:</b> ${user.email || 'N/A'}\n` +
+    `<b>Phone:</b> ${user.phone || 'N/A'}\n` +
     `<b>Referral Code:</b> ${user.referralCode}\n` +
     `<b>Date:</b> ${new Date(user.createdAt).toLocaleString()}\n` +
     (user.referredBy ? `<b>Referred By:</b> ${user.referredBy}\n` : '')

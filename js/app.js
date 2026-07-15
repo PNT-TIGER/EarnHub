@@ -98,8 +98,10 @@ function handleLogin() {
 function handleRegister() {
   const username = $('regUsername').value.trim();
   const password = $('regPassword').value.trim();
+  const email = $('regEmail').value.trim();
+  const phone = $('regPhone').value.trim();
   const refCode = $('regRef').value.trim();
-  if (!username || !password) {
+  if (!username || !password || !email || !phone) {
     $('authError').textContent = 'Please fill in all fields';
     return;
   }
@@ -111,6 +113,14 @@ function handleRegister() {
     $('authError').textContent = 'Password must be at least 4 characters';
     return;
   }
+  if (!email.includes('@') || !email.includes('.')) {
+    $('authError').textContent = 'Enter a valid email address';
+    return;
+  }
+  if (phone.length < 8) {
+    $('authError').textContent = 'Enter a valid phone number';
+    return;
+  }
   let users = DB.get('users', []);
   if (users.find(u => u.username === username)) {
     $('authError').textContent = 'Username already exists';
@@ -120,6 +130,8 @@ function handleRegister() {
     id: uid(),
     username,
     password,
+    email,
+    phone,
     balance: 0,
     completedTasks: [],
     claimedTasks: [],
