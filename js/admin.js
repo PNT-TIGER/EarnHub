@@ -319,11 +319,22 @@ function viewUserScreenshots(userId) {
   let html = '';
   for (const [taskId, ss] of Object.entries(user.taskScreenshots)) {
     const task = tasks.find(t => t.id === taskId);
+    const ssData = typeof ss === 'string' ? ss : ss.data;
+    const ssStatus = typeof ss === 'string' ? 'pending' : (ss.status || 'pending');
+    const isClaimed = user.claimedTasks && user.claimedTasks.includes(taskId);
     html += `
       <div style="margin-bottom:16px;padding:12px;background:var(--bg-secondary);border-radius:var(--radius-sm)">
         <div style="font-size:13px;font-weight:600;margin-bottom:4px">${task ? task.title : 'Unknown Task'}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Reward: ${task ? task.reward : '?'} USDT | ${user.claimedTasks.includes(taskId) ? '✅ Claimed' : '⏳ Pending'}</div>
-        <img src="${ss}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:var(--bg-primary)" onclick="window.open(this.src)">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Reward: ${task ? task.reward : '?'} USDT | Status: ${isClaimed ? '✅ Approved & Paid' : ssStatus === 'approved' ? '✅ Approved' : ssStatus === 'rejected' ? '❌ Rejected' : '⏳ Pending Review'}</div>
+        <img src="${ssData}" style="width:100%;max-height:300px;object-fit:contain;border-radius:8px;background:var(--bg-primary);cursor:pointer;margin-bottom:8px" onclick="window.open(this.src)">
+        ${!isClaimed && ssStatus === 'pending' ? `
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-success" onclick="approveScreenshot('${userId}','${taskId}',${task ? task.reward : 0})" style="flex:1">✅ Approve</button>
+            <button class="btn btn-sm btn-danger" onclick="rejectScreenshot('${userId}','${taskId}')" style="flex:1">❌ Reject</button>
+          </div>
+        ` : ''}
+        ${!isClaimed && ssStatus === 'approved' ? '<div style="font-size:13px;color:var(--accent-green);font-weight:600">✅ Approved - Reward added to balance</div>' : ''}
+        ${ssStatus === 'rejected' ? '<div style="font-size:13px;color:var(--accent-red);font-weight:600">❌ Rejected by admin</div>' : ''}
       </div>
     `;
   }
@@ -332,6 +343,44 @@ function viewUserScreenshots(userId) {
   document.getElementById('adminModalBody').innerHTML = html || '<div class="empty-state"><p>No screenshots</p></div>';
   document.getElementById('adminModalFooter').innerHTML = '<button class="btn btn-outline btn-small" onclick="closeAdminModal()">Close</button>';
   modal.classList.add('active');
+}
+
+function approveScreenshot(userId, taskId, reward) {
+  let users = DB.get('users', []);
+  const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots || !user.taskScreenshots[taskId]) return;
+  const ss = user.taskScreenshots[taskId];
+  if (typeof ss === 'string') {
+    user.taskScreenshots[taskId] = { data: ss, status: 'approved' };
+  } else {
+    ss.status = 'approved';
+  }
+  if (!user.claimedTasks) user.claimedTasks = [];
+  if (!user.claimedTasks.includes(taskId)) {
+    user.claimedTasks.push(taskId);
+    user.balance += reward;
+  }
+  DB.set('users', users);
+  closeAdminModal();
+  showToast(`✅ Approved! $${reward} added to ${user.username}`, 'success');
+  sendTelegramMessage(`<b>✅ Screenshot Approved</b>\n\n<b>User:</b> ${user.username}\n<b>Reward:</b> +${reward} USDT\n<b>Auto-added to balance</b>`);
+  loadAdminUsers();
+}
+
+function rejectScreenshot(userId, taskId) {
+  let users = DB.get('users', []);
+  const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots || !user.taskScreenshots[taskId]) return;
+  const ss = user.taskScreenshots[taskId];
+  if (typeof ss === 'string') {
+    user.taskScreenshots[taskId] = { data: ss, status: 'rejected' };
+  } else {
+    ss.status = 'rejected';
+  }
+  DB.set('users', users);
+  closeAdminModal();
+  showToast('❌ Screenshot rejected', 'info');
+  loadAdminUsers();
 }
 
 // ===== WITHDRAWALS =====

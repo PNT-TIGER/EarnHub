@@ -266,42 +266,39 @@ function renderTasks(filter = 'all') {
   }
   container.innerHTML = '';
   filtered.forEach((t, i) => {
-    const isCompleted = currentUser.completedTasks.includes(t.id);
-    const isClaimed = currentUser.claimedTasks.includes(t.id);
-    const card = el('div', {
-      className: 'task-card',
-      style: `animation-delay: ${i * 0.05}s`
-    },
-      el('div', { className: 'task-card-header' },
-        el('div', { className: 'task-title' }, t.title),
-        el('div', { className: 'task-reward' }, '+' + t.reward + ' USDT')
-      ),
-      el('div', { className: 'task-description' }, t.description || 'No description'),
-      el('div', { className: 'task-actions' },
-        el('button', {
-          className: 'task-btn btn-open-task',
-          onclick: () => {
-            if (t.link) {
-              window.open(t.link, '_blank');
-              markTaskCompleted(t.id);
-            } else showToast('No link provided', 'error');
-          }
-        }, isCompleted ? '✅ Re-Open' : '🔗 Open Task'),
-        isCompleted && !isClaimed ? el('button', {
-          className: 'task-btn',
-          style: 'background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color)',
-          onclick: () => uploadScreenshot(t.id)
-        }, currentUser.taskScreenshots?.[t.id] ? '📸 Resubmit' : '📸 Screenshot') : null,
-        el('button', {
-          className: 'task-btn btn-claim',
-          disabled: !isCompleted || isClaimed || !currentUser.taskScreenshots?.[t.id],
-          onclick: () => claimTask(t.id)
-        }, isClaimed ? '✓ Claimed' : !currentUser.taskScreenshots?.[t.id] && isCompleted ? '📸 Upload First' : isCompleted ? '💰 Claim Reward' : '⏳ Open First')
-      ),
-      el('div', { className: `task-status ${isClaimed ? 'status-claimed' : currentUser.taskScreenshots?.[t.id] ? 'status-completed' : 'status-pending'}` },
-        isClaimed ? '✓ Reward Claimed' : currentUser.taskScreenshots?.[t.id] ? '✅ Screenshot Uploaded - Claim Now' : isCompleted ? '📸 Upload Screenshot to Claim' : '⏳ Click "Open Task" to start'
-      )
-    );
+  const isCompleted = currentUser.completedTasks.includes(t.id);
+  const isClaimed = currentUser.claimedTasks.includes(t.id);
+  const ss = currentUser.taskScreenshots?.[t.id];
+  const ssStatus = ss ? (typeof ss === 'string' ? 'pending' : (ss.status || 'pending')) : null;
+  const card = el('div', {
+    className: 'task-card',
+    style: `animation-delay: ${i * 0.05}s`
+  },
+    el('div', { className: 'task-card-header' },
+      el('div', { className: 'task-title' }, t.title),
+      el('div', { className: 'task-reward' }, '+' + t.reward + ' USDT')
+    ),
+    el('div', { className: 'task-description' }, t.description || 'No description'),
+    el('div', { className: 'task-actions' },
+      el('button', {
+        className: 'task-btn btn-open-task',
+        onclick: () => {
+          if (t.link) {
+            window.open(t.link, '_blank');
+            markTaskCompleted(t.id);
+          } else showToast('No link provided', 'error');
+        }
+      }, isCompleted && !isClaimed ? '✅ Re-Open' : isClaimed ? '✅ Done' : '🔗 Open Task'),
+      isCompleted && !isClaimed ? el('button', {
+        className: 'task-btn',
+        style: ssStatus === 'pending' ? 'background:var(--accent-gold);color:var(--bg-primary);border:none' : 'background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color)',
+        onclick: () => uploadScreenshot(t.id)
+      }, ssStatus === 'pending' ? '⏳ Pending' : ssStatus === 'approved' ? '✅ Approved' : '📸 Screenshot') : null
+    ),
+    el('div', { className: `task-status ${isClaimed ? 'status-claimed' : ssStatus === 'pending' ? 'status-pending' : ssStatus === 'approved' ? 'status-completed' : 'status-pending'}` },
+      isClaimed ? '✓ Reward Received' : ssStatus === 'pending' ? '⏳ Pending Admin Approval' : ssStatus === 'approved' ? '✅ Approved - Check Balance' : isCompleted ? '📸 Upload Screenshot' : '⏳ Click "Open Task" to start'
+    )
+  );
     container.appendChild(card);
   });
 }
@@ -320,10 +317,12 @@ function uploadScreenshot(taskId) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (!currentUser.taskScreenshots) currentUser.taskScreenshots = {};
-      currentUser.taskScreenshots[taskId] = ev.target.result;
+      currentUser.taskScreenshots[taskId] = { data: ev.target.result, status: 'pending' };
       saveCurrentUser();
-      showToast('Screenshot uploaded! ✅ Now you can claim reward', 'success');
       renderTasks();
+      renderHome();
+      sendTelegramMessage(`<b>📸 Screenshot Uploaded</b>\n\n<b>User:</b> ${currentUser.username}\n<b>Task ID:</b> ${taskId}\n<b>Status:</b> Pending Approval\n\nCheck admin panel to review.`);
+      showToast('Screenshot uploaded! Waiting for admin approval ⏳', 'info');
     };
     reader.readAsDataURL(file);
   };
