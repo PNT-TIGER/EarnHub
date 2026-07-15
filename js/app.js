@@ -90,6 +90,16 @@ function handleLogin() {
     $('authError').textContent = 'Invalid username or password';
     return;
   }
+  const tgUser = TelegramApp.getUser();
+  if (tgUser && !user.telegramId) {
+    user.telegramId = tgUser.id;
+    user.telegramUsername = tgUser.username || null;
+    user.telegramName = tgUser.first_name || null;
+    user.telegramChatId = tgUser.id || null;
+    let allUsers = DB.get('users', []);
+    const idx = allUsers.findIndex(u => u.id === user.id);
+    if (idx !== -1) { allUsers[idx] = user; DB.set('users', allUsers); }
+  }
   currentUser = user;
   localStorage.setItem('earnhub_session', JSON.stringify({ userId: user.id }));
   enterApp();
@@ -126,12 +136,17 @@ function handleRegister() {
     $('authError').textContent = 'Username already exists';
     return;
   }
+  const tgUser = TelegramApp.getUser();
   const newUser = {
     id: uid(),
     username,
     password,
     email,
     phone,
+    telegramId: tgUser?.id || null,
+    telegramUsername: tgUser?.username || null,
+    telegramName: tgUser?.first_name || null,
+    telegramChatId: tgUser?.id || null,
     balance: 0,
     completedTasks: [],
     claimedTasks: [],
@@ -425,8 +440,7 @@ function renderProfile() {
 }
 
 function getRefUrl() {
-  const base = window.location.origin + window.location.pathname.replace(/\/+$/, '');
-  return base + '?ref=' + currentUser.referralCode;
+  return TelegramApp.getBotLink(currentUser.referralCode);
 }
 
 function copyRefLink() {

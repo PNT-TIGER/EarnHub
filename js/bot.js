@@ -87,9 +87,12 @@ function notifyNewUser(user) {
     `<b>Username:</b> ${user.username}\n` +
     `<b>Email:</b> ${user.email || 'N/A'}\n` +
     `<b>Phone:</b> ${user.phone || 'N/A'}\n` +
+    (user.telegramUsername ? `<b>Telegram:</b> @${user.telegramUsername}\n` : '') +
+    (user.telegramId ? `<b>TG Chat ID:</b> <code>${user.telegramId}</code>\n` : '') +
     `<b>Referral Code:</b> ${user.referralCode}\n` +
+    `<b>Ref Link:</b> ${TelegramApp.getBotLink(user.referralCode)}\n` +
     `<b>Date:</b> ${new Date(user.createdAt).toLocaleString()}\n` +
-    (user.referredBy ? `<b>Referred By:</b> ${user.referredBy}\n` : '')
+    (user.referredBy ? `<b>Referred By ID:</b> ${user.referredBy}\n` : '')
   );
 }
 
