@@ -156,12 +156,12 @@ while True:
                     api("sendMessage", chat_id=chat_id,
                         text=f"✨ <b>Welcome to EarnHub, {user.get('first_name','User')}!</b> ✨\n\n🎉 <b>+0.01 USDT</b> Welcome Bonus added!\n\n👇 Open Mini App:",
                         parse_mode="HTML",
-                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","url":MINI_APP_URL}]]}))
+                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","web_app":{"url":MINI_APP_URL}}]]}))
                 else:
                     api("sendMessage", chat_id=chat_id,
                         text=f"👋 <b>Welcome to EarnHub, {user.get('first_name','User')}!</b>",
                         parse_mode="HTML",
-                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","url":MINI_APP_URL}]]}))
+                        reply_markup=json.dumps({"inline_keyboard":[[{"text":"🚀 Open Mini App","web_app":{"url":MINI_APP_URL}}]]}))
 
             # /admin
             elif text == "/admin" and chat_id in ADMIN_IDS:
