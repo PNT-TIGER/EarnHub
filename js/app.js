@@ -154,14 +154,14 @@ function handleRegister() {
     totalWithdrawn: 0,
     usdtAddress: '',
     referredBy: '',
-    referralCode: username + Math.random().toString(36).substr(2, 4).toUpperCase(),
+    referralCode: String(tgUser?.id || uid()),
     referrals: [],
     referralEarnings: 0,
     createdAt: new Date().toISOString(),
     giftCodesRedeemed: []
   };
   if (refCode) {
-    const referrer = users.find(u => u.referralCode === refCode);
+    const referrer = users.find(u => u.referralCode === refCode || u.telegramId == refCode || u.telegramChatId == refCode);
     if (referrer) {
       newUser.referredBy = referrer.id;
     }
@@ -446,7 +446,8 @@ function renderProfile() {
 }
 
 function getRefUrl() {
-  return TelegramApp.getBotLink(currentUser.referralCode);
+  const chatId = currentUser.telegramId || currentUser.telegramChatId || currentUser.referralCode;
+  return `https://t.me/earn_hub_task_bot?start=${chatId}`;
 }
 
 function copyRefLink() {
