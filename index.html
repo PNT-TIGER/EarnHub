@@ -127,22 +127,29 @@
           </div>
         </div>
 
-        <div class="section-title" style="font-size:18px">Quick Tasks</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-title" style="font-size:18px;margin:0">Quick Tasks</div>
+          <button class="btn btn-small btn-outline" onclick="refreshData()" style="font-size:12px">🔄 Sync</button>
+        </div>
         <div id="quickTasks"></div>
 
         <div class="referral-card animate-fade-in" style="margin-top:16px">
-          <div class="referral-title">🔗 Your Referral Code</div>
-          <div class="referral-desc">Share your code and earn <span class="referral-commission">10%</span> commission on their earnings!</div>
+          <div class="referral-title">🔗 Your Referral Link</div>
+          <div class="referral-desc">Share your link and earn <span class="referral-commission">10%</span> commission on their earnings!</div>
           <div class="copy-field">
-            <input type="text" id="homeRefLink" readonly style="flex:1;padding:10px 12px;background:transparent;border:none;color:var(--text-primary);font-weight:700;font-size:14px">
-            <button class="copy-btn" onclick="copyRefLink()">Copy</button>
+            <input type="text" id="homeRefLink" readonly style="flex:1;padding:10px 12px;background:transparent;border:none;color:var(--text-primary);font-weight:700;font-size:13px">
+            <button class="copy-btn" onclick="copyRefLink()">Copy Link</button>
           </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Anyone who opens this link will automatically get your referral code</div>
         </div>
       </div>
 
       <!-- ===== TASKS PAGE ===== -->
       <div id="tasksPage" class="page-section">
-        <div class="section-title animate-fade-in">📋 Tasks</div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="section-title animate-fade-in" style="margin:0">📋 Tasks</div>
+          <button class="btn btn-small btn-outline animate-fade-in" onclick="refreshData()" style="font-size:12px">🔄 Sync</button>
+        </div>
         <div class="section-subtitle animate-fade-in delay-1">Complete tasks and earn USDT rewards</div>
 
         <div class="task-filters">

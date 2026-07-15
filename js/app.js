@@ -205,7 +205,7 @@ function renderHome() {
   $('statEarnings').textContent = '$' + currentUser.balance.toFixed(2);
   $('statReferrals').textContent = currentUser.referrals.length;
   $('statWithdrawn').textContent = '$' + currentUser.totalWithdrawn.toFixed(2);
-  $('homeRefLink').textContent = currentUser.referralCode;
+  $('homeRefLink').value = getRefUrl();
   renderQuickTasks();
 }
 
@@ -389,20 +389,25 @@ function renderProfile() {
   $('profileWithdrawn').textContent = '$' + currentUser.totalWithdrawn.toFixed(2);
   $('profileReferrals').textContent = currentUser.referrals.length;
   $('profileRefEarnings').textContent = '$' + currentUser.referralEarnings.toFixed(2);
-  $('profileRefLink').value = currentUser.referralCode;
+  $('profileRefLink').value = getRefUrl();
   $('profileUsdtAddress').value = currentUser.usdtAddress || '';
   renderMessageBox();
   renderWithdrawHistory();
+}
+
+function getRefUrl() {
+  const base = window.location.origin + window.location.pathname.replace(/\/+$/, '');
+  return base + '?ref=' + currentUser.referralCode;
 }
 
 function copyRefLink() {
   const input = $('profileRefLink');
   input.select();
   navigator.clipboard.writeText(input.value).then(() => {
-    showToast('Referral code copied! Share it with friends', 'success');
+    showToast('Referral link copied! Share it with friends', 'success');
   }).catch(() => {
     document.execCommand('copy');
-    showToast('Referral code copied!', 'success');
+    showToast('Referral link copied!', 'success');
   });
 }
 
@@ -543,6 +548,16 @@ function claimGiftCode() {
   renderProfile();
 }
 
+function refreshData() {
+  showToast('Syncing latest data...', 'info');
+  fetchDataFromTelegram(() => {
+    showToast('Data synced successfully! ✅', 'success');
+    if ($('homePage')?.classList.contains('active')) renderHome();
+    if ($('tasksPage')?.classList.contains('active')) renderTasks();
+    if ($('adsPage')?.classList.contains('active')) renderAds();
+  });
+}
+
 function closeModal(id) {
   $(id)?.classList.remove('active');
 }
@@ -560,19 +575,29 @@ document.addEventListener('click', (e) => {
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   TelegramApp.init();
-  const session = JSON.parse(localStorage.getItem('earnhub_session') || 'null');
-  if (session) {
-    const users = DB.get('users', []);
-    const user = users.find(u => u.id === session.userId);
-    if (user) {
-      currentUser = user;
-      $('authContainer').style.display = 'none';
-      $('appContainer').style.display = 'block';
-      updateHeader();
-      navigateTo('home');
-      return;
+
+  fetchDataFromTelegram(() => {
+    const session = JSON.parse(localStorage.getItem('earnhub_session') || 'null');
+    if (session) {
+      const users = DB.get('users', []);
+      const user = users.find(u => u.id === session.userId);
+      if (user) {
+        currentUser = user;
+        $('authContainer').style.display = 'none';
+        $('appContainer').style.display = 'block';
+        updateHeader();
+        navigateTo('home');
+        return;
+      }
     }
-  }
-  $('authContainer').style.display = 'flex';
-  $('appContainer').style.display = 'none';
+    $('authContainer').style.display = 'flex';
+    $('appContainer').style.display = 'none';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const refParam = urlParams.get('ref');
+    if (refParam) {
+      $('regRef').value = refParam;
+      showToast('Referral code detected! Complete registration to join', 'info');
+    }
+  });
 });

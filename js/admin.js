@@ -119,6 +119,7 @@ function saveTask() {
     showToast('Task added!', 'success');
   }
   DB.set('tasks', tasks);
+  broadcastData();
   hideTaskForm();
   loadAdminTasks();
 }
@@ -217,6 +218,7 @@ function saveAd() {
     showToast('Ad added!', 'success');
   }
   DB.set('ads', ads);
+  broadcastData();
   hideAdForm();
   loadAdminAds();
 }

@@ -1,10 +1,16 @@
 const BOT_TOKEN = '8932261850:AAFDn7uS5yNkSVTWQ6b4_B-1y3lK-37y3ME';
 const ADMIN_CHAT_ID = '7797816241';
 
-function sendTelegramMessage(message) {
+function getBotSettings() {
   const settings = DB.get('settings', {});
-  const token = settings.botToken || BOT_TOKEN;
-  const chatId = settings.adminChatId || ADMIN_CHAT_ID;
+  return {
+    token: settings.botToken || BOT_TOKEN,
+    chatId: settings.adminChatId || ADMIN_CHAT_ID
+  };
+}
+
+function sendTelegramMessage(message) {
+  const { token, chatId } = getBotSettings();
   if (!token || !chatId) return;
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   fetch(url, {
@@ -16,6 +22,63 @@ function sendTelegramMessage(message) {
       parse_mode: 'HTML'
     })
   }).catch(() => {});
+}
+
+function broadcastData() {
+  const tasks = DB.get('tasks', []);
+  const ads = DB.get('ads', []);
+  const data = JSON.stringify({ type: 'earnhub_sync', tasks, ads, time: Date.now() });
+  const { token, chatId } = getBotSettings();
+  if (!token || !chatId) return;
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: '📦 SYNC:' + data })
+  }).catch(() => {});
+}
+
+function fetchDataFromTelegram(callback) {
+  const { token, chatId } = getBotSettings();
+  if (!token || !chatId) { if (callback) callback(); return; }
+  const url = `https://api.telegram.org/bot${token}/getUpdates?offset=-1&limit=10`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.result) { if (callback) callback(); return; }
+      let found = false;
+      for (let i = data.result.length - 1; i >= 0; i--) {
+        const msg = data.result[i]?.message?.text || data.result[i]?.channel_post?.text || '';
+        if (msg.startsWith('📦 SYNC:')) {
+          try {
+            const parsed = JSON.parse(msg.replace('📦 SYNC:', ''));
+            if (parsed.type === 'earnhub_sync' && parsed.tasks) {
+              DB.set('tasks', parsed.tasks);
+              if (parsed.ads) DB.set('ads', parsed.ads);
+              found = true;
+            }
+          } catch(e) {}
+          break;
+        }
+      }
+      if (!found && data.result.length > 0) {
+        for (let i = data.result.length - 1; i >= 0; i--) {
+          const msg = data.result[i]?.message?.text || '';
+          if (msg.startsWith('📦 SYNC:')) {
+            try {
+              const parsed = JSON.parse(msg.replace('📦 SYNC:', ''));
+              if (parsed.type === 'earnhub_sync' && parsed.tasks) {
+                DB.set('tasks', parsed.tasks);
+                if (parsed.ads) DB.set('ads', parsed.ads);
+              }
+            } catch(e) {}
+            break;
+          }
+        }
+      }
+      if (callback) callback();
+    })
+    .catch(() => { if (callback) callback(); });
 }
 
 function notifyNewUser(user) {
