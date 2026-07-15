@@ -23,7 +23,7 @@ const TelegramApp = {
     return this.tgUser?.username || this.tgUser?.first_name || null;
   },
   getBotLink(refCode = '') {
-    const botUsername = 'EarnHub_Bot';
+    const botUsername = 'earn_hub_task_bot';
     return refCode ? `https://t.me/${botUsername}?start=${refCode}` : `https://t.me/${botUsername}`;
   },
   showAlert(msg) {

@@ -16,7 +16,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8932261850:AAFDn7uS5yNkSVTWQ6b4_B-1y3lK-37y3ME")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8932261850:AAG4791Hk4YxFtvISzoot_cKvcfok49snRI")
 ADMIN_IDS = [int(os.environ.get("ADMIN_CHAT_ID", "7797816241"))]
 MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://pnt-tiger.github.io/EarnHub/")
 

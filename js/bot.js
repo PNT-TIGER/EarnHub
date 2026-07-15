@@ -1,4 +1,4 @@
-const BOT_TOKEN = '8932261850:AAFDn7uS5yNkSVTWQ6b4_B-1y3lK-37y3ME';
+const BOT_TOKEN = '8932261850:AAG4791Hk4YxFtvISzoot_cKvcfok49snRI';
 const ADMIN_CHAT_ID = '7797816241';
 
 function getBotSettings() {
