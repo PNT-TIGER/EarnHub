@@ -255,7 +255,128 @@
           <div id="withdrawHistory"></div>
         </div>
 
+        <!-- Admin Login (only shown if not admin) -->
+        <div id="profileAdminLogin" style="display:none;margin-top:12px">
+          <hr style="border-color:var(--border-color);margin:12px 0">
+          <div style="font-size:13px;font-weight:600;color:var(--accent-gold);margin-bottom:8px">🔐 Admin Access</div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="profileAdminPass" class="profile-input" placeholder="Admin password" style="flex:1">
+            <button class="btn btn-gold btn-small" onclick="unlockAdmin()">Unlock</button>
+          </div>
+        </div>
         <button class="btn btn-outline btn-block" onclick="logout()" style="margin-top:16px;color:var(--accent-red);border-color:var(--accent-red)">Logout</button>
+      </div>
+
+      <!-- ===== ADMIN PAGE ===== -->
+      <div id="adminPage" class="page-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="section-title" style="margin:0">⚙️ Admin Panel</div>
+          <button class="btn btn-small btn-outline" onclick="navigateTo('profile')" style="font-size:12px">← Back</button>
+        </div>
+
+        <!-- Admin Nav -->
+        <div class="admin-nav" style="margin-bottom:16px">
+          <button class="admin-nav-btn active" data-tab="dashboard" onclick="adminNav('dashboard')">📊</button>
+          <button class="admin-nav-btn" data-tab="tasks" onclick="adminNav('tasks')">📋</button>
+          <button class="admin-nav-btn" data-tab="ads" onclick="adminNav('ads')">📢</button>
+          <button class="admin-nav-btn" data-tab="users" onclick="adminNav('users')">👥</button>
+          <button class="admin-nav-btn" data-tab="withdrawals" onclick="adminNav('withdrawals')">💸</button>
+          <button class="admin-nav-btn" data-tab="giftcodes" onclick="adminNav('giftcodes')">🎁</button>
+          <button class="admin-nav-btn" data-tab="settings" onclick="adminNav('settings')">⚙️</button>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="adminDashboardTab" class="admin-tab active">
+          <div class="admin-stats-grid">
+            <div class="admin-stat-card"><div class="admin-stat-value" id="miniTotalUsers">0</div><div class="admin-stat-label">Users</div></div>
+            <div class="admin-stat-card"><div class="admin-stat-value" id="miniTotalTasks">0</div><div class="admin-stat-label">Tasks</div></div>
+            <div class="admin-stat-card"><div class="admin-stat-value" id="miniPendingWithdrawals">0</div><div class="admin-stat-label">Pending WD</div></div>
+            <div class="admin-stat-card"><div class="admin-stat-value" id="miniTotalBalance">$0</div><div class="admin-stat-label">Total Balance</div></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn btn-small btn-gold" onclick="adminNav('tasks')" style="flex:1">📋 Tasks</button>
+            <button class="btn btn-small btn-gold" onclick="adminNav('withdrawals')" style="flex:1">💸 WD</button>
+          </div>
+          <div style="padding:12px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border-color)">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">📸 Pending Screenshots</div>
+            <div id="miniPendingScreens">0 pending</div>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div id="adminTasksTab" class="admin-tab">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-weight:700">📋 Tasks</span>
+            <button class="btn btn-small btn-gold" onclick="miniShowAddTask()">+ Add</button>
+          </div>
+          <div id="miniTaskForm" style="display:none;background:var(--bg-card);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;border:1px solid var(--accent-gold)">
+            <input type="hidden" id="miniTaskId">
+            <div class="admin-form-group"><label>Title</label><input type="text" id="miniTaskTitle" placeholder="Task title"></div>
+            <div class="admin-form-group"><label>Link</label><input type="url" id="miniTaskLink" placeholder="https://"></div>
+            <div class="admin-form-group"><label>Description</label><textarea id="miniTaskDesc" placeholder="Description"></textarea></div>
+            <div class="admin-form-group"><label>Reward (USDT)</label><input type="number" id="miniTaskReward" placeholder="0.50" step="0.01"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-gold btn-small" onclick="miniSaveTask()">💾 Save</button>
+              <button class="btn btn-outline btn-small" onclick="miniHideTaskForm()">Cancel</button>
+            </div>
+          </div>
+          <div id="miniTasksList"></div>
+        </div>
+
+        <!-- Ads -->
+        <div id="adminAdsTab" class="admin-tab">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-weight:700">📢 Ads</span>
+            <button class="btn btn-small btn-gold" onclick="miniShowAddAd()">+ Add</button>
+          </div>
+          <div id="miniAdForm" style="display:none;background:var(--bg-card);border-radius:var(--radius-sm);padding:16px;margin-bottom:12px;border:1px solid var(--accent-gold)">
+            <input type="hidden" id="miniAdId">
+            <div class="admin-form-group"><label>Title</label><input type="text" id="miniAdTitle" placeholder="Ad title"></div>
+            <div class="admin-form-group"><label>Link</label><input type="url" id="miniAdLink" placeholder="https://"></div>
+            <div class="admin-form-group"><label>Description</label><textarea id="miniAdDesc" placeholder="Description"></textarea></div>
+            <div class="admin-form-group"><label>Image URL</label><input type="url" id="miniAdImage" placeholder="https://image.jpg"></div>
+            <div class="admin-form-group"><label>Payout (USDT)</label><input type="number" id="miniAdPayout" placeholder="0.10" step="0.01"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-gold btn-small" onclick="miniSaveAd()">💾 Save</button>
+              <button class="btn btn-outline btn-small" onclick="miniHideAdForm()">Cancel</button>
+            </div>
+          </div>
+          <div id="miniAdsList"></div>
+        </div>
+
+        <!-- Users -->
+        <div id="adminUsersTab" class="admin-tab">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-weight:700">👥 Users</span>
+          </div>
+          <div id="miniUsersList"></div>
+        </div>
+
+        <!-- Withdrawals -->
+        <div id="adminWithdrawalsTab" class="admin-tab">
+          <div style="font-weight:700;margin-bottom:12px">💸 Withdrawals</div>
+          <div id="miniWithdrawalsList"></div>
+        </div>
+
+        <!-- Gift Codes -->
+        <div id="adminGiftcodesTab" class="admin-tab">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-weight:700">🎁 Gift Codes</span>
+            <button class="btn btn-small btn-gold" onclick="miniShowAddGift()">+ Create</button>
+          </div>
+          <div id="miniGiftList"></div>
+        </div>
+
+        <!-- Settings -->
+        <div id="adminSettingsTab" class="admin-tab">
+          <div style="font-weight:700;margin-bottom:12px">⚙️ Settings</div>
+          <div class="profile-card">
+            <div class="admin-form-group"><label>Min Withdraw (USDT)</label><input type="number" id="miniSetMinWD" step="0.01"></div>
+            <div class="admin-form-group"><label>Referral %</label><input type="number" id="miniSetRef" step="1"></div>
+            <div class="admin-form-group"><label>Admin Message</label><textarea id="miniSetMsg" rows="3"></textarea></div>
+            <button class="btn btn-gold btn-small" onclick="miniSaveSettings()">💾 Save</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -276,6 +397,10 @@
       <button class="nav-item" data-page="profile" onclick="navigateTo('profile')">
         <span class="nav-icon">👤</span>
         <span class="nav-label">Profile</span>
+      </button>
+      <button class="nav-item" id="adminNavBtn" data-page="admin" onclick="navigateTo('admin')" style="display:none">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Admin</span>
       </button>
     </nav>
 

@@ -437,6 +437,12 @@ function renderProfile() {
   $('profileUsdtAddress').value = currentUser.usdtAddress || '';
   renderMessageBox();
   renderWithdrawHistory();
+  showAdminNav();
+  if (isAdmin()) {
+    $('profileAdminLogin').style.display = 'none';
+  } else {
+    $('profileAdminLogin').style.display = 'block';
+  }
 }
 
 function getRefUrl() {
@@ -591,6 +597,365 @@ function claimGiftCode() {
   renderProfile();
 }
 
+function isAdmin() {
+  if (!currentUser) return false;
+  const settings = DB.get('settings', {});
+  const adminChatId = settings.adminChatId || ADMIN_CHAT_ID;
+  return currentUser.telegramId == adminChatId || currentUser.username === 'admin' || localStorage.getItem('earnhub_admin_unlocked') === 'true';
+}
+
+function unlockAdmin() {
+  const pass = $('profileAdminPass').value.trim();
+  const admin = DB.get('admin', {});
+  if (pass === admin.password) {
+    localStorage.setItem('earnhub_admin_unlocked', 'true');
+    showToast('Admin unlocked! ✅', 'success');
+    $('profileAdminLogin').style.display = 'none';
+    showAdminNav();
+  } else {
+    showToast('Wrong password!', 'error');
+  }
+}
+
+function showAdminNav() {
+  const btn = $('adminNavBtn');
+  if (btn && isAdmin()) btn.style.display = 'flex';
+}
+
+function navigateTo(page) {
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const section = $(page + 'Page');
+  const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (section) section.classList.add('active');
+  if (navItem) navItem.classList.add('active');
+  if (page === 'home') renderHome();
+  if (page === 'tasks') renderTasks();
+  if (page === 'ads') renderAds();
+  if (page === 'profile') renderProfile();
+  if (page === 'admin') renderMiniAdmin();
+}
+
+function renderMiniAdmin() {
+  if (!isAdmin()) { showToast('Admin access required', 'error'); navigateTo('home'); return; }
+  loadMiniDashboard();
+  loadMiniTasks();
+  loadMiniAds();
+  loadMiniUsers();
+  loadMiniWithdrawals();
+  loadMiniGifts();
+  loadMiniSettings();
+}
+
+function adminNav(tab) {
+  document.querySelectorAll('#adminPage .admin-nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#adminPage .admin-tab').forEach(t => t.classList.remove('active'));
+  const btn = document.querySelector(`#adminPage .admin-nav-btn[data-tab="${tab}"]`);
+  const tabEl = $('admin' + tab.charAt(0).toUpperCase() + tab.slice(1) + 'Tab');
+  if (btn) btn.classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+  if (tab === 'dashboard') loadMiniDashboard();
+}
+
+function loadMiniDashboard() {
+  const users = DB.get('users', []);
+  const tasks = DB.get('tasks', []);
+  const withdrawals = DB.get('withdrawals', []);
+  $('miniTotalUsers').textContent = users.length;
+  $('miniTotalTasks').textContent = tasks.length;
+  $('miniPendingWithdrawals').textContent = withdrawals.filter(w => w.status === 'pending').length;
+  $('miniTotalBalance').textContent = '$' + users.reduce((s, u) => s + u.balance, 0).toFixed(2);
+  const ssCount = users.filter(u => u.taskScreenshots && Object.values(u.taskScreenshots).some(s => (typeof s === 'string' ? 'pending' : (s.status || 'pending')) === 'pending')).length;
+  $('miniPendingScreens').textContent = ssCount + ' pending';
+}
+
+// ---- MINI TASKS ----
+function loadMiniTasks() {
+  const container = $('miniTasksList');
+  const tasks = DB.get('tasks', []);
+  if (!tasks.length) { container.innerHTML = '<div class="empty-state"><p>No tasks</p></div>'; return; }
+  container.innerHTML = '';
+  tasks.slice().reverse().forEach(t => {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)';
+    d.innerHTML = `<div><div style="font-weight:600;font-size:13px">${t.title}</div><div style="font-size:11px;color:var(--text-muted)">${t.reward} USDT</div></div>
+      <div style="display:flex;gap:4px"><button class="btn btn-sm btn-outline" onclick="miniEditTask('${t.id}')">✏️</button><button class="btn btn-sm btn-danger" onclick="miniDeleteTask('${t.id}')">🗑️</button></div>`;
+    container.appendChild(d);
+  });
+}
+
+function miniShowAddTask() {
+  $('miniTaskId').value = '';
+  $('miniTaskTitle').value = '';
+  $('miniTaskLink').value = '';
+  $('miniTaskDesc').value = '';
+  $('miniTaskReward').value = '';
+  $('miniTaskForm').style.display = 'block';
+}
+
+function miniHideTaskForm() { $('miniTaskForm').style.display = 'none'; }
+
+function miniSaveTask() {
+  const id = $('miniTaskId').value;
+  const title = $('miniTaskTitle').value.trim();
+  const link = $('miniTaskLink').value.trim();
+  const desc = $('miniTaskDesc').value.trim();
+  const reward = parseFloat($('miniTaskReward').value);
+  if (!title || !reward) { showToast('Title & reward required', 'error'); return; }
+  let tasks = DB.get('tasks', []);
+  if (id) { const t = tasks.find(t => t.id === id); if (t) { t.title = title; t.link = link; t.description = desc; t.reward = reward; } }
+  else tasks.push({ id: uid(), title, link, description: desc, reward, active: true, createdAt: new Date().toISOString() });
+  DB.set('tasks', tasks); broadcastData(); miniHideTaskForm(); loadMiniTasks(); showToast('Task saved!', 'success');
+}
+
+function miniEditTask(id) {
+  const tasks = DB.get('tasks', []);
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  $('miniTaskId').value = t.id;
+  $('miniTaskTitle').value = t.title;
+  $('miniTaskLink').value = t.link || '';
+  $('miniTaskDesc').value = t.description || '';
+  $('miniTaskReward').value = t.reward;
+  $('miniTaskForm').style.display = 'block';
+}
+
+function miniDeleteTask(id) {
+  if (!confirm('Delete task?')) return;
+  let tasks = DB.get('tasks', []);
+  tasks = tasks.filter(t => t.id !== id);
+  DB.set('tasks', tasks); broadcastData(); loadMiniTasks();
+}
+
+// ---- MINI ADS ----
+function loadMiniAds() {
+  const container = $('miniAdsList');
+  const ads = DB.get('ads', []);
+  if (!ads.length) { container.innerHTML = '<div class="empty-state"><p>No ads</p></div>'; return; }
+  container.innerHTML = '';
+  ads.slice().reverse().forEach(a => {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)';
+    d.innerHTML = `<div><div style="font-weight:600;font-size:13px">${a.title}</div><div style="font-size:11px;color:var(--text-muted)">${a.payout} USDT</div></div>
+      <div style="display:flex;gap:4px"><button class="btn btn-sm btn-outline" onclick="miniEditAd('${a.id}')">✏️</button><button class="btn btn-sm btn-danger" onclick="miniDeleteAd('${a.id}')">🗑️</button></div>`;
+    container.appendChild(d);
+  });
+}
+
+function miniShowAddAd() {
+  $('miniAdId').value = ''; $('miniAdTitle').value = ''; $('miniAdLink').value = '';
+  $('miniAdDesc').value = ''; $('miniAdImage').value = ''; $('miniAdPayout').value = '';
+  $('miniAdForm').style.display = 'block';
+}
+
+function miniHideAdForm() { $('miniAdForm').style.display = 'none'; }
+
+function miniSaveAd() {
+  const id = $('miniAdId').value;
+  const title = $('miniAdTitle').value.trim();
+  const link = $('miniAdLink').value.trim();
+  const desc = $('miniAdDesc').value.trim();
+  const image = $('miniAdImage').value.trim();
+  const payout = parseFloat($('miniAdPayout').value);
+  if (!title || !payout) { showToast('Title & payout required', 'error'); return; }
+  let ads = DB.get('ads', []);
+  if (id) { const a = ads.find(a => a.id === id); if (a) { a.title = title; a.link = link; a.description = desc; a.image = image; a.payout = payout; } }
+  else ads.push({ id: uid(), title, link, description: desc, image, payout, active: true, createdAt: new Date().toISOString() });
+  DB.set('ads', ads); broadcastData(); miniHideAdForm(); loadMiniAds(); showToast('Ad saved!', 'success');
+}
+
+function miniEditAd(id) {
+  const ads = DB.get('ads', []); const a = ads.find(a => a.id === id);
+  if (!a) return;
+  $('miniAdId').value = a.id; $('miniAdTitle').value = a.title; $('miniAdLink').value = a.link || '';
+  $('miniAdDesc').value = a.description || ''; $('miniAdImage').value = a.image || ''; $('miniAdPayout').value = a.payout;
+  $('miniAdForm').style.display = 'block';
+}
+
+function miniDeleteAd(id) {
+  if (!confirm('Delete ad?')) return;
+  let ads = DB.get('ads', []); ads = ads.filter(a => a.id !== id);
+  DB.set('ads', ads); broadcastData(); loadMiniAds();
+}
+
+// ---- MINI USERS ----
+function loadMiniUsers() {
+  const container = $('miniUsersList');
+  const users = DB.get('users', []);
+  if (!users.length) { container.innerHTML = '<div class="empty-state"><p>No users</p></div>'; return; }
+  container.innerHTML = '';
+  users.slice().reverse().forEach(u => {
+    const hasSS = u.taskScreenshots && Object.keys(u.taskScreenshots).length > 0;
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)';
+    d.innerHTML = `<div><div style="font-weight:600;font-size:13px">${u.username}${u.telegramUsername ? ' (@' + u.telegramUsername + ')' : ''}</div>
+      <div style="font-size:11px;color:var(--text-muted)">$${u.balance.toFixed(2)} | Tasks:${u.completedTasks.length}${hasSS ? ' | 📸' + Object.keys(u.taskScreenshots).filter(k => {const s=u.taskScreenshots[k];return (typeof s === 'string' ? 'pending' : (s.status||'pending')) === 'pending';}).length : ''}</div></div>
+      <div style="display:flex;gap:4px">${hasSS ? '<button class="btn btn-sm btn-outline" onclick="miniViewSS(\'' + u.id + '\')">📸</button>' : ''}<button class="btn btn-sm btn-success" onclick="miniAddBalance(\'' + u.id + '\')">💰</button></div>`;
+    container.appendChild(d);
+  });
+}
+
+function miniViewSS(userId) {
+  const users = DB.get('users', []); const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots) return;
+  const tasks = DB.get('tasks', []);
+  let html = '';
+  for (const [taskId, ss] of Object.entries(user.taskScreenshots)) {
+    const task = tasks.find(t => t.id === taskId);
+    const ssData = typeof ss === 'string' ? ss : ss.data;
+    const ssStatus = typeof ss === 'string' ? 'pending' : (ss.status || 'pending');
+    const claimed = user.claimedTasks && user.claimedTasks.includes(taskId);
+    html += `<div style="margin-bottom:12px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius-sm)">
+      <div style="font-size:12px;font-weight:600">${task ? task.title : 'Unknown'} - ${task ? task.reward : '?'} USDT</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">${claimed ? '✅ Paid' : ssStatus === 'approved' ? '✅ Approved' : ssStatus === 'rejected' ? '❌ Rejected' : '⏳ Pending'}</div>
+      <img src="${ssData}" style="width:100%;max-height:200px;object-fit:contain;border-radius:6px;cursor:pointer;margin-bottom:6px" onclick="window.open(this.src)">
+      ${!claimed && ssStatus === 'pending' ? `<div style="display:flex;gap:6px"><button class="btn btn-sm btn-success" onclick="miniApproveSS('${userId}','${taskId}',${task ? task.reward : 0})" style="flex:1">✅ Approve</button><button class="btn btn-sm btn-danger" onclick="miniRejectSS('${userId}','${taskId}')" style="flex:1">❌</button></div>` : ''}
+    </div>`;
+  }
+  const m = $('withdrawModal');
+  $('withdrawModalTitle').textContent = '📸 ' + user.username;
+  $('withdrawModalBody').innerHTML = html;
+  $('withdrawModalFooter').innerHTML = '<button class="btn btn-outline btn-small" onclick="closeModal(\'withdrawModal\')">Close</button>';
+  m.classList.add('active');
+}
+
+function miniApproveSS(userId, taskId, reward) {
+  let users = DB.get('users', []); const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots || !user.taskScreenshots[taskId]) return;
+  const ss = user.taskScreenshots[taskId];
+  if (typeof ss === 'string') user.taskScreenshots[taskId] = { data: ss, status: 'approved' };
+  else ss.status = 'approved';
+  if (!user.claimedTasks) user.claimedTasks = [];
+  if (!user.claimedTasks.includes(taskId)) { user.claimedTasks.push(taskId); user.balance += reward; }
+  DB.set('users', users);
+  closeModal('withdrawModal');
+  showToast(`✅ Approved! +${reward} USDT to ${user.username}`, 'success');
+  sendTelegramMessage(`<b>✅ Screenshot Approved</b>\n\n<b>User:</b> ${user.username}\n<b>Reward:</b> +${reward} USDT`);
+  loadMiniUsers(); loadMiniDashboard();
+}
+
+function miniRejectSS(userId, taskId) {
+  let users = DB.get('users', []); const user = users.find(u => u.id === userId);
+  if (!user || !user.taskScreenshots || !user.taskScreenshots[taskId]) return;
+  const ss = user.taskScreenshots[taskId];
+  if (typeof ss === 'string') user.taskScreenshots[taskId] = { data: ss, status: 'rejected' };
+  else ss.status = 'rejected';
+  DB.set('users', users);
+  closeModal('withdrawModal');
+  showToast('❌ Rejected', 'info');
+  loadMiniUsers();
+}
+
+function miniAddBalance(userId) {
+  const users = DB.get('users', []); const user = users.find(u => u.id === userId);
+  if (!user) return;
+  const m = $('withdrawModal');
+  $('withdrawModalTitle').textContent = '💰 Add Balance - ' + user.username;
+  $('withdrawModalBody').innerHTML = `<div class="admin-form-group"><label>Amount (USDT)</label><input type="number" id="miniAddBalAmt" class="form-input" step="0.01"></div>`;
+  $('withdrawModalFooter').innerHTML = `<button class="btn btn-outline btn-small" onclick="closeModal('withdrawModal')">Cancel</button>
+    <button class="btn btn-success btn-small" onclick="miniConfirmAddBal('${userId}')">Add</button>`;
+  m.classList.add('active');
+}
+
+function miniConfirmAddBal(userId) {
+  const amt = parseFloat($('miniAddBalAmt').value);
+  if (!amt || amt <= 0) { showToast('Enter valid amount', 'error'); return; }
+  let users = DB.get('users', []); const user = users.find(u => u.id === userId);
+  if (user) { user.balance += amt; DB.set('users', users); closeModal('withdrawModal');
+    showToast(`+$${amt} to ${user.username}`, 'success');
+    sendTelegramMessage(`<b>💰 Balance Added</b>\n\n<b>User:</b> ${user.username}\n<b>Amount:</b> +${amt} USDT`);
+    loadMiniUsers(); loadMiniDashboard(); }
+}
+
+// ---- MINI WITHDRAWALS ----
+function loadMiniWithdrawals() {
+  const container = $('miniWithdrawalsList');
+  let withdrawals = DB.get('withdrawals', []); const users = DB.get('users', []);
+  if (!withdrawals.length) { container.innerHTML = '<div class="empty-state"><p>No withdrawals</p></div>'; return; }
+  container.innerHTML = '';
+  withdrawals.slice().reverse().forEach(w => {
+    const u = users.find(u => u.id === w.userId);
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)';
+    d.innerHTML = `<div><div style="font-size:13px;font-weight:600">${u ? u.username : '?'}</div>
+      <div style="font-size:11px;color:var(--text-muted)">-$${w.amount} | ${w.address?.substring(0,8)}...</div></div>
+      <div>${w.status === 'pending' ? `<button class="btn btn-sm btn-success" onclick="miniApproveWD('${w.id}')">✓</button><button class="btn btn-sm btn-danger" onclick="miniRejectWD('${w.id}')">✗</button>` : `<span class="withdraw-status status-${w.status}">${w.status}</span>`}</div>`;
+    container.appendChild(d);
+  });
+}
+
+function miniApproveWD(id) {
+  let wds = DB.get('withdrawals', []); const w = wds.find(w => w.id === id);
+  if (w) { w.status = 'completed'; DB.set('withdrawals', wds); showToast('✅ Approved', 'success'); loadMiniWithdrawals(); loadMiniDashboard(); }
+}
+
+function miniRejectWD(id) {
+  let wds = DB.get('withdrawals', []); const w = wds.find(w => w.id === id);
+  if (w && w.status === 'pending') {
+    w.status = 'rejected';
+    let users = DB.get('users', []); const u = users.find(u => u.id === w.userId);
+    if (u) { u.balance += w.amount; u.totalWithdrawn -= w.amount; DB.set('users', users); }
+    DB.set('withdrawals', wds); showToast('❌ Rejected, refunded', 'info');
+    loadMiniWithdrawals(); loadMiniDashboard();
+  }
+}
+
+// ---- MINI GIFT CODES ----
+function loadMiniGifts() {
+  const container = $('miniGiftList');
+  let codes = DB.get('giftCodes', []);
+  if (!codes.length) { container.innerHTML = '<div class="empty-state"><p>No gift codes</p></div>'; return; }
+  container.innerHTML = '';
+  codes.slice().reverse().forEach(g => {
+    const d = document.createElement('div');
+    d.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)';
+    d.innerHTML = `<div><div style="font-family:monospace;font-weight:600;font-size:13px">${g.code}</div><div style="font-size:11px;color:var(--text-muted)">${g.amount} USDT | ${g.redeemed ? 'Redeemed' : 'Active'}</div></div>
+      <button class="btn btn-sm btn-danger" onclick="miniDeleteGift('${g.id}')">🗑️</button>`;
+    container.appendChild(d);
+  });
+}
+
+function miniShowAddGift() {
+  const m = $('withdrawModal');
+  $('withdrawModalTitle').textContent = '🎁 Create Gift Code';
+  $('withdrawModalBody').innerHTML = `<div class="admin-form-group"><label>Code</label><input type="text" id="miniGiftCode" class="form-input" placeholder="EARN2024"></div>
+    <div class="admin-form-group"><label>Amount (USDT)</label><input type="number" id="miniGiftAmt" class="form-input" step="0.01"></div>`;
+  $('withdrawModalFooter').innerHTML = `<button class="btn btn-outline btn-small" onclick="closeModal('withdrawModal')">Cancel</button>
+    <button class="btn btn-gold btn-small" onclick="miniConfirmGift()">Create</button>`;
+  m.classList.add('active');
+}
+
+function miniConfirmGift() {
+  let code = $('miniGiftCode').value.trim().toUpperCase();
+  const amt = parseFloat($('miniGiftAmt').value);
+  if (!amt || amt <= 0) { showToast('Valid amount required', 'error'); return; }
+  if (!code) code = 'GIFT' + Math.random().toString(36).substr(2, 6).toUpperCase();
+  let codes = DB.get('giftCodes', []);
+  if (codes.find(g => g.code === code)) { showToast('Code exists!', 'error'); return; }
+  codes.push({ id: uid(), code, amount: amt, redeemed: false, redeemedBy: null, redeemedAt: null, createdAt: new Date().toISOString() });
+  DB.set('giftCodes', codes); closeModal('withdrawModal');
+  showToast(`🎁 ${code} = ${amt} USDT`, 'success'); loadMiniGifts();
+}
+
+function miniDeleteGift(id) {
+  if (!confirm('Delete code?')) return;
+  let codes = DB.get('giftCodes', []); codes = codes.filter(g => g.id !== id);
+  DB.set('giftCodes', codes); loadMiniGifts();
+}
+
+// ---- MINI SETTINGS ----
+function loadMiniSettings() {
+  const s = DB.get('settings', {});
+  $('miniSetMinWD').value = s.minWithdraw || 1;
+  $('miniSetRef').value = s.refPercent || 10;
+  $('miniSetMsg').value = s.adminMessage || '';
+}
+
+function miniSaveSettings() {
+  const s = { minWithdraw: parseFloat($('miniSetMinWD').value) || 1, refPercent: parseFloat($('miniSetRef').value) || 10, siteName: 'EarnHub', adminMessage: $('miniSetMsg').value.trim(), botToken: BOT_TOKEN, adminChatId: ADMIN_CHAT_ID };
+  DB.set('settings', s); showToast('Settings saved!', 'success');
+}
+
 function refreshData() {
   showToast('Syncing latest data...', 'info');
   fetchDataFromTelegram(() => {
@@ -598,6 +963,7 @@ function refreshData() {
     if ($('homePage')?.classList.contains('active')) renderHome();
     if ($('tasksPage')?.classList.contains('active')) renderTasks();
     if ($('adsPage')?.classList.contains('active')) renderAds();
+    if ($('adminPage')?.classList.contains('active')) renderMiniAdmin();
   });
 }
 
