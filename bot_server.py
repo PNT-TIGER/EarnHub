@@ -46,18 +46,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
     args = context.args
-
     ref_code = args[0] if args else None
+    is_new = False
 
     if str(chat_id) not in users_db:
+        is_new = True
         users_db[str(chat_id)] = {
             "chat_id": chat_id,
             "telegram_username": user.username or user.first_name,
             "first_name": user.first_name,
             "username": f"tg_{user.id}",
             "password": f"pass_{user.id}",
-            "balance": 0,
-            "referral_code": f"REF{user.id}",
+            "balance": 0.01,
+            "referral_code": str(user.id),
             "referred_by": "",
             "completed_tasks": [],
             "claimed_tasks": [],
@@ -66,21 +67,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         if ref_code:
             for uid, u in users_db.items():
-                if u.get("referral_code") == ref_code and uid != str(chat_id):
+                if u.get("referral_code") == str(ref_code) and uid != str(chat_id):
                     users_db[str(chat_id)]["referred_by"] = uid
                     u["balance"] = u.get("balance", 0) + 0.1
                     break
         save_data()
-        msg = f"Welcome {user.first_name}! Your account is ready.\nReferral Code: REF{user.id}"
-    else:
-        msg = f"Welcome back {user.first_name}!"
 
-    keyboard = [[InlineKeyboardButton("Open EarnHub", url=MINI_APP_URL)]]
+    if is_new:
+        msg = (
+            f"✨ <b>Welcome to EarnHub, {user.first_name}!</b> ✨\n\n"
+            f"🎉 <b>Welcome Bonus: +0.01 USDT</b> added to your account!\n\n"
+            f"📌 Complete tasks, watch ads & earn more USDT\n"
+            f"💰 Minimum withdrawal: $1 USDT (BEP20)\n"
+            f"👥 Invite friends & earn 10% commission\n\n"
+            f"👇 Click <b>Open Mini App</b> to start earning!"
+        )
+    else:
+        u = users_db.get(str(chat_id), {})
+        bal = u.get("balance", 0)
+        msg = (
+            f"👋 <b>Welcome back, {user.first_name}!</b>\n\n"
+            f"💰 Your Balance: <b>{bal:.2f} USDT</b>\n\n"
+            f"👇 Click <b>Open Mini App</b> to continue earning!"
+        )
+
+    keyboard = [[InlineKeyboardButton("🚀 Open Mini App", url=MINI_APP_URL)]]
     if ref_code:
-        keyboard.append([InlineKeyboardButton("Open with Referral", url=f"{MINI_APP_URL}?ref={ref_code}")])
+        keyboard.append([InlineKeyboardButton("🚀 Open with Referral", url=f"{MINI_APP_URL}?ref={ref_code}")])
 
     await update.message.reply_text(
-        f"{msg}\n\nClick below to open the app:",
+        msg,
+        parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
